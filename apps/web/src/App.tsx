@@ -1,0 +1,216 @@
+import React, { lazy, Suspense } from 'react';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Outlet,
+  Navigate,
+} from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { Providers } from './providers';
+import { RequireAuth, RequireRole, GuestOnly } from './routes/guards';
+
+// ── Public pages ─────────────────────────────────────────────
+import { LandingPage } from './pages/public/LandingPage';
+import { FacilitiesPage, FacilityDetailPage } from './pages/public/FacilitiesPage';
+
+// ── Auth pages ───────────────────────────────────────────────
+import { LoginPage, RegisterPage, ForgotPasswordPage } from './pages/auth/AuthPages';
+
+// ── Customer pages (lazy) ────────────────────────────────────
+const CustomerDashboard = lazy(() => import('./pages/customer/Dashboard'));
+const QueueTicketPage = lazy(() => import('./pages/customer/QueuePage'));
+
+// ── Staff pages (lazy) ──────────────────────────────────────
+const StaffQueueDashboard = lazy(() => import('./pages/staff/QueueDashboard'));
+
+// ── Admin pages (lazy) ──────────────────────────────────────
+const AdminOverview = lazy(() => import('./pages/admin/Overview'));
+
+// Loading fallback
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-surface-soft">
+      <div className="w-10 h-10 border-2 border-hairline border-t-primary rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// Not found
+function NotFound() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+      <p className="text-8xl font-semibold text-ink mb-4">404</p>
+      <h1 className="text-display-sm font-semibold text-ink mb-2">Page not found</h1>
+      <p className="text-body-sm text-muted mb-6">
+        The page you're looking for doesn't exist.
+      </p>
+      <a href="/" className="btn-primary">Go home</a>
+    </div>
+  );
+}
+
+const router = createBrowserRouter([
+  // Public routes
+  { path: '/', element: <LandingPage /> },
+  { path: '/facilities', element: <FacilitiesPage /> },
+  { path: '/facilities/:facilityId', element: <FacilityDetailPage /> },
+
+  // Auth routes (only for guests)
+  {
+    element: <GuestOnly />,
+    children: [
+      { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegisterPage /> },
+      { path: '/forgot-password', element: <ForgotPasswordPage /> },
+    ],
+  },
+
+  // Authenticated routes
+  {
+    element: <RequireAuth />,
+    children: [
+      // Customer routes
+      {
+        element: <RequireRole roles={['customer']} />,
+        children: [
+          {
+            path: '/app',
+            children: [
+              { index: true, element: <Navigate to="/app/dashboard" replace /> },
+              {
+                path: 'dashboard',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'queue/:ticketId',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <QueueTicketPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'queue',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'appointments',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'history',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'notifications',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'profile',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+            ],
+          },
+        ],
+      },
+
+      // Staff routes
+      {
+        element: <RequireRole roles={['staff', 'facility_admin']} />,
+        children: [
+          {
+            path: '/staff',
+            children: [
+              { index: true, element: <Navigate to="/staff/queue" replace /> },
+              {
+                path: 'queue',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
+            ],
+          },
+        ],
+      },
+
+      // Admin routes
+      {
+        element: <RequireRole roles={['facility_admin', 'system_admin']} />,
+        children: [
+          {
+            path: '/admin',
+            children: [
+              { index: true, element: <Navigate to="/admin/overview" replace /> },
+              {
+                path: 'overview',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <AdminOverview />
+                  </Suspense>
+                ),
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+
+  { path: '*', element: <NotFound /> },
+]);
+
+function App() {
+  return (
+    <Providers>
+      <RouterProvider router={router} />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: '#111111',
+            color: '#ffffff',
+            fontSize: '14px',
+            fontFamily: 'Inter, sans-serif',
+            borderRadius: '8px',
+            padding: '12px 16px',
+          },
+          success: {
+            iconTheme: { primary: '#10b981', secondary: '#ffffff' },
+          },
+          error: {
+            iconTheme: { primary: '#ef4444', secondary: '#ffffff' },
+          },
+        }}
+      />
+    </Providers>
+  );
+}
+
+export default App;

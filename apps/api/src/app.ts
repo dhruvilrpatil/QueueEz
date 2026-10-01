@@ -1,0 +1,83 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import compression from 'compression';
+
+import { config } from './config';
+import { generalLimiter } from './middleware/rateLimit';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+
+// Route modules
+import authRoutes from './modules/auth/routes';
+import facilityRoutes from './modules/facilities/routes';
+import appointmentRoutes from './modules/appointments/routes';
+import queueRoutes from './modules/queues/routes';
+import notificationRoutes from './modules/notifications/routes';
+import analyticsRoutes from './modules/analytics/routes';
+
+const app = express();
+
+// ============================================================
+// SECURITY MIDDLEWARE
+// ============================================================
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+app.use(cors({
+  origin: config.clientUrl,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// ============================================================
+// GENERAL MIDDLEWARE
+// ============================================================
+app.use(compression());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+if (config.isDevelopment) {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+app.use(generalLimiter);
+
+// ============================================================
+// HEALTH CHECK
+// ============================================================
+app.get('/health', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      status: 'healthy',
+      version: '1.0.0',
+      environment: config.nodeEnv,
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// ============================================================
+// API ROUTES
+// ============================================================
+const API_PREFIX = '/api/v1';
+
+app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/facilities`, facilityRoutes);
+app.use(`${API_PREFIX}/appointments`, appointmentRoutes);
+app.use(`${API_PREFIX}/queues`, queueRoutes);
+app.use(`${API_PREFIX}/notifications`, notificationRoutes);
+app.use(`${API_PREFIX}/analytics`, analyticsRoutes);
+
+// ============================================================
+// ERROR HANDLING
+// ============================================================
+app.use(notFoundHandler);
+app.use(errorHandler);
+
+export default app;

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import { clsx } from 'clsx';
-import { X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -25,7 +24,6 @@ export function Modal({
   description,
   children,
   size = 'md',
-  hideClose = false,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -48,14 +46,14 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
       aria-labelledby={title ? 'modal-title' : undefined}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-ink/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-ink/40 backdrop-blur-xs transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -64,37 +62,26 @@ export function Modal({
       <div
         ref={dialogRef}
         className={clsx(
-          'relative w-full bg-canvas rounded-xl shadow-elevated border border-hairline',
+          'relative w-full bg-canvas rounded-xl shadow-elevated border border-hairline overflow-hidden',
           sizeClasses[size]
         )}
       >
-        {/* Header */}
-        {(title || !hideClose) && (
-          <div className="flex items-start justify-between p-6 border-b border-hairline">
-            <div>
+        {/* Content */}
+        <div className="p-6">
+          {(title || description) && (
+            <div className="mb-4">
               {title && (
-                <h2 id="modal-title" className="text-title-md text-ink">
+                <h2 id="modal-title" className="text-title-md font-semibold text-ink">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="text-body-sm text-muted mt-1">{description}</p>
+                <p className="text-body-sm text-muted mt-1 leading-relaxed">{description}</p>
               )}
             </div>
-            {!hideClose && (
-              <button
-                onClick={onClose}
-                className="ml-4 w-8 h-8 flex items-center justify-center text-muted hover:text-ink rounded-md hover:bg-surface-soft transition-colors"
-                aria-label="Close modal"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="p-6">{children}</div>
+          )}
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -128,17 +115,28 @@ export function ConfirmDialog({
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <div className="space-y-4">
         <div>
-          <h3 className="text-title-sm text-ink">{title}</h3>
-          {description && <p className="text-body-sm text-muted mt-1">{description}</p>}
+          <h3 className="text-title-sm font-semibold text-ink">{title}</h3>
+          {description && <p className="text-body-sm text-muted mt-1 leading-relaxed">{description}</p>}
         </div>
-        <div className="flex gap-3 justify-end">
-          <button onClick={onClose} disabled={isLoading} className="btn-secondary">
+        <div className="flex gap-2.5 justify-end pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLoading}
+            className="px-4 py-2 text-body-sm font-semibold rounded-lg border border-hairline bg-canvas text-ink hover:bg-surface-soft transition-colors cursor-pointer disabled:opacity-50"
+          >
             {cancelLabel}
           </button>
           <button
+            type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className={isDanger ? 'btn-danger' : 'btn-primary'}
+            className={clsx(
+              'px-4 py-2 text-body-sm font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50',
+              isDanger
+                ? 'bg-error text-white hover:bg-error/90'
+                : 'bg-primary text-white hover:bg-primary-active'
+            )}
           >
             {isLoading ? 'Processing...' : confirmLabel}
           </button>

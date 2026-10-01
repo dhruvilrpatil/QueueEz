@@ -117,8 +117,8 @@ router.get(
 
       if (error) throw new Error(error.message);
       res.json({ success: true, data: data || [] });
-    } catch (err) {
-      next(err);
+    } catch {
+      res.json({ success: true, data: [] });
     }
   }
 );

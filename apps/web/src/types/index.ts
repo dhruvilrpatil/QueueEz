@@ -155,6 +155,7 @@ export interface QueueTicket {
   services?: Pick<Service, 'name' | 'duration_minutes'>;
   facilities?: Pick<Facility, 'name' | 'address'>;
   counters?: Pick<Counter, 'name' | 'number'>;
+  profiles?: Pick<Profile, 'full_name' | 'phone'>;
   created_at: string;
   updated_at: string;
 }

@@ -9,7 +9,7 @@ export const joinQueueSchema = z.object({
 });
 
 export const callTicketSchema = z.object({
-  counter_id: z.string().uuid(),
+  counter_id: z.string().uuid().optional(),
 });
 
 export const transferTicketSchema = z.object({

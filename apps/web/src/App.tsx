@@ -154,6 +154,30 @@ const router = createBrowserRouter([
                   </Suspense>
                 ),
               },
+              {
+                path: 'counter',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'appointments',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'history',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
             ],
           },
         ],
@@ -175,6 +199,32 @@ const router = createBrowserRouter([
                   </Suspense>
                 ),
               },
+              { path: 'queues', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'appointments', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'services', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'counters', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'staff', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'analytics', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'settings', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+            ],
+          },
+        ],
+      },
+
+      // System routes
+      {
+        element: <RequireRole roles={['system_admin']} />,
+        children: [
+          {
+            path: '/system',
+            children: [
+              { index: true, element: <Navigate to="/system/organizations" replace /> },
+              { path: 'organizations', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'facilities', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'users', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'analytics', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
             ],
           },
         ],

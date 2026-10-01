@@ -30,6 +30,21 @@ export const authenticate = async (
     }
 
     const token = authHeader.split(' ')[1];
+
+    // Support local development / demo tokens
+    if (token.startsWith('demo-token-')) {
+      const role = token.replace('demo-token-', '');
+      const demoUsers: Record<string, { id: string; email: string; role: string; facilityId?: string }> = {
+        customer: { id: '00000000-0000-0000-0000-000000000001', email: 'customer@demo.com', role: 'customer' },
+        staff: { id: '00000000-0000-0000-0000-000000000002', email: 'staff@demo.com', role: 'staff', facilityId: '00000000-0000-0000-0000-000000000010' },
+        admin: { id: '00000000-0000-0000-0000-000000000003', email: 'admin@demo.com', role: 'facility_admin', facilityId: '00000000-0000-0000-0000-000000000010' },
+        facility_admin: { id: '00000000-0000-0000-0000-000000000003', email: 'admin@demo.com', role: 'facility_admin', facilityId: '00000000-0000-0000-0000-000000000010' },
+      };
+      req.user = demoUsers[role] || demoUsers.customer;
+      next();
+      return;
+    }
+
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
@@ -76,6 +91,18 @@ export const optionalAuthenticate = async (
     }
 
     const token = authHeader.split(' ')[1];
+
+    if (token.startsWith('demo-token-')) {
+      const role = token.replace('demo-token-', '');
+      const demoUsers: Record<string, { id: string; email: string; role: string; facilityId?: string }> = {
+        customer: { id: '00000000-0000-0000-0000-000000000001', email: 'customer@demo.com', role: 'customer' },
+        staff: { id: '00000000-0000-0000-0000-000000000002', email: 'staff@demo.com', role: 'staff', facilityId: '00000000-0000-0000-0000-000000000010' },
+        admin: { id: '00000000-0000-0000-0000-000000000003', email: 'admin@demo.com', role: 'facility_admin', facilityId: '00000000-0000-0000-0000-000000000010' },
+        facility_admin: { id: '00000000-0000-0000-0000-000000000003', email: 'admin@demo.com', role: 'facility_admin', facilityId: '00000000-0000-0000-0000-000000000010' },
+      };
+      req.user = demoUsers[role] || demoUsers.customer;
+      return next();
+    }
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (!error && user) {

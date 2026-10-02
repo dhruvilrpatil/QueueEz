@@ -26,28 +26,20 @@ const StaffQueueDashboard = lazy(() => import('./pages/staff/QueueDashboard'));
 // ── Admin pages (lazy) ──────────────────────────────────────
 const AdminOverview = lazy(() => import('./pages/admin/Overview'));
 
-// Loading fallback
+import { PageSkeleton } from './components/ui/Skeleton';
+
+// Loading fallback with skeleton screen
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface-soft">
-      <div className="w-10 h-10 border-2 border-hairline border-t-primary rounded-full animate-spin" />
+    <div className="min-h-screen bg-surface-soft p-6 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        <PageSkeleton />
+      </div>
     </div>
   );
 }
 
-// Not found
-function NotFound() {
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
-      <p className="text-8xl font-semibold text-ink mb-4">404</p>
-      <h1 className="text-display-sm font-semibold text-ink mb-2">Page not found</h1>
-      <p className="text-body-sm text-muted mb-6">
-        The page you're looking for doesn't exist.
-      </p>
-      <a href="/" className="btn-primary">Go home</a>
-    </div>
-  );
-}
+import { NotFoundPage } from './pages/public/NotFoundPage';
 
 const router = createBrowserRouter([
   // Public routes
@@ -138,9 +130,9 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Staff routes
+      // Staff routes (strictly staff)
       {
-        element: <RequireRole roles={['staff', 'facility_admin']} />,
+        element: <RequireRole roles={['staff']} />,
         children: [
           {
             path: '/staff',
@@ -172,6 +164,22 @@ const router = createBrowserRouter([
               },
               {
                 path: 'history',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'notifications',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'settings',
                 element: (
                   <Suspense fallback={<PageLoader />}>
                     <StaffQueueDashboard />
@@ -232,7 +240,7 @@ const router = createBrowserRouter([
     ],
   },
 
-  { path: '*', element: <NotFound /> },
+  { path: '*', element: <NotFoundPage /> },
 ]);
 
 function App() {

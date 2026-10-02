@@ -1,0 +1,78 @@
+{
+  "items": [
+    {
+      "name": "Dr. Jane Smith",
+      "username": "@janesmith",
+      "avatarUrl": "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80",
+      "status": "active",
+      "role": "Lead Physician / Staff",
+      "email": "staff@demo.com",
+      "teams": [
+        { "name": "General Care", "color": "brand" },
+        { "name": "Outpatient", "color": "blue" },
+        { "name": "Desk 1", "color": "success" }
+      ]
+    },
+    {
+      "name": "Administrator",
+      "username": "@admin_metro",
+      "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      "status": "active",
+      "role": "Facility Director",
+      "email": "admin@demo.com",
+      "teams": [
+        { "name": "Operations", "color": "purple" },
+        { "name": "Admin", "color": "indigo" }
+      ]
+    },
+    {
+      "name": "Dr. Marcus Vance",
+      "username": "@mvance",
+      "avatarUrl": "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80",
+      "status": "active",
+      "role": "Cardiology Specialist",
+      "email": "marcus.v@metrohealth.org",
+      "teams": [
+        { "name": "Cardiology", "color": "pink" },
+        { "name": "Consultations", "color": "brand" }
+      ]
+    },
+    {
+      "name": "Sarah Jenkins, RN",
+      "username": "@sjenkins",
+      "avatarUrl": "https://images.unsplash.com/photo-1594824813689-ee6f1c7d23d8?w=150&auto=format&fit=crop&q=80",
+      "status": "active",
+      "role": "Head Nurse / Triage",
+      "email": "s.jenkins@metrohealth.org",
+      "teams": [
+        { "name": "Triage", "color": "orange" },
+        { "name": "Emergency", "color": "error" },
+        { "name": "Desk 2", "color": "blue" }
+      ]
+    },
+    {
+      "name": "David Kim",
+      "username": "@dkim",
+      "avatarUrl": "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=150&auto=format&fit=crop&q=80",
+      "status": "inactive",
+      "role": "Radiology Tech",
+      "email": "david.kim@metrohealth.org",
+      "teams": [
+        { "name": "Diagnostics", "color": "gray" },
+        { "name": "Imaging", "color": "indigo" }
+      ]
+    },
+    {
+      "name": "Priya Sharma",
+      "username": "@psharma",
+      "avatarUrl": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80",
+      "status": "active",
+      "role": "Patient Receptionist",
+      "email": "p.sharma@metrohealth.org",
+      "teams": [
+        { "name": "Front Desk", "color": "brand" },
+        { "name": "Check-in", "color": "success" }
+      ]
+    }
+  ]
+}

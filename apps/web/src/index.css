@@ -185,7 +185,15 @@
 
   /* Skeleton loading */
   .skeleton {
-    @apply bg-surface-card animate-pulse rounded;
+    @apply rounded;
+    background: linear-gradient(
+      90deg,
+      #eceef1 0%,
+      #f5f6f8 50%,
+      #eceef1 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.6s infinite ease-in-out;
   }
 
   /* Container */
@@ -222,4 +230,13 @@
 @keyframes livePulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }

@@ -75,8 +75,25 @@ function QueueTicketPage() {
   if (isLoading) {
     return (
       <AppLayout role="customer">
-        <PageHeader title="Queue Status" />
-        <SkeletonCard />
+        <PageHeader title="Queue Status" description="Loading real-time queue position..." />
+        <div className="max-w-xl mx-auto space-y-4">
+          <div className="bg-canvas border border-hairline rounded-xl p-8 text-center space-y-4">
+            <div className="skeleton h-4 w-24 mx-auto" />
+            <div className="skeleton h-16 w-44 mx-auto" />
+            <div className="skeleton h-6 w-20 rounded-full mx-auto" />
+            <div className="mt-8 grid grid-cols-3 gap-4">
+              <div className="skeleton h-20 rounded-xl" />
+              <div className="skeleton h-20 rounded-xl" />
+              <div className="skeleton h-20 rounded-xl" />
+            </div>
+          </div>
+          <div className="bg-canvas border border-hairline rounded-xl p-6 space-y-3">
+            <div className="skeleton h-5 w-20" />
+            <div className="skeleton h-4 w-full" />
+            <div className="skeleton h-4 w-full" />
+            <div className="skeleton h-4 w-3/4" />
+          </div>
+        </div>
       </AppLayout>
     );
   }

@@ -17,7 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@untitledui/icons": ["./src/components/base/icons/untitledui.tsx"],
+      "react-aria-components": ["./src/types/react-aria.ts"]
     }
   },
   "include": ["src"]

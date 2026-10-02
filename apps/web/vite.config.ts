@@ -7,6 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@untitledui/icons': path.resolve(__dirname, './src/components/base/icons/untitledui.tsx'),
+      'react-aria-components': path.resolve(__dirname, './src/types/react-aria.ts'),
     },
   },
   server: {

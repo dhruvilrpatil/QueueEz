@@ -44,17 +44,24 @@ export function LoginPage() {
   const [error, setError] = useState('');
 
   const navigateAfterAuth = (userEmail: string) => {
+    const isStaff = userEmail === 'staff@demo.com';
+    const isAdmin = userEmail === 'admin@demo.com';
+    const defaultRoute = isStaff ? '/staff/queue' : isAdmin ? '/admin/overview' : '/app/dashboard';
+
     if (redirectParam && redirectParam.startsWith('/')) {
-      navigate(redirectParam, { replace: true });
-      return;
+      const isAllowed =
+        (isStaff && redirectParam.startsWith('/staff')) ||
+        (isAdmin && (redirectParam.startsWith('/admin') || redirectParam.startsWith('/system'))) ||
+        (!isStaff && !isAdmin && redirectParam.startsWith('/app')) ||
+        redirectParam === '/' || redirectParam.startsWith('/facilities');
+
+      if (isAllowed) {
+        navigate(redirectParam, { replace: true });
+        return;
+      }
     }
-    if (userEmail === 'staff@demo.com') {
-      navigate('/staff/queue', { replace: true });
-    } else if (userEmail === 'admin@demo.com') {
-      navigate('/admin/overview', { replace: true });
-    } else {
-      navigate('/app/dashboard', { replace: true });
-    }
+
+    navigate(defaultRoute, { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -100,8 +100,7 @@ const staffNavItems: NavItemType[] = [
   { label: 'Counter Desk', href: '/staff/counter', icon: Layers },
   { label: 'Appointments', href: '/staff/appointments', icon: Calendar },
   { label: 'Served History', href: '/staff/history', icon: ClipboardList },
-  { label: 'Facility Overview', href: '/admin/overview', icon: BarChart2 },
-  { label: 'Notifications', href: '/app/notifications', icon: Bell, badge: 2 },
+  { label: 'Notifications', href: '/staff/notifications', icon: Bell, badge: 2 },
 ];
 
 const adminNavItems: NavItemType[] = [
@@ -315,16 +314,22 @@ export function SidebarNavigationSimple({
 // MAIN APPSIDEBAR COMPONENT (Fixed Width, No Collapsing)
 // ============================================================
 export function AppSidebar({ role }: SidebarProps) {
+  const { profile } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const items = roleNavMap[role] || customerNavItems;
+  const activeRole = profile?.role || role;
+  const items = roleNavMap[activeRole] || customerNavItems;
 
-  const footerItems: NavItemType[] = [
-    {
-      label: 'Settings',
-      href: role === 'facility_admin' || role === 'system_admin' ? '/admin/settings' : '/app/profile',
-      icon: Settings,
-    },
-  ];
+  const getFooterItems = (r: 'customer' | 'staff' | 'facility_admin' | 'system_admin'): NavItemType[] => {
+    if (r === 'facility_admin' || r === 'system_admin') {
+      return [{ label: 'Settings', href: '/admin/settings', icon: Settings }];
+    }
+    if (r === 'staff') {
+      return [{ label: 'Settings', href: '/staff/settings', icon: Settings }];
+    }
+    return [{ label: 'Settings', href: '/app/profile', icon: Settings }];
+  };
+
+  const footerItems = getFooterItems(activeRole);
 
   return (
     <>
@@ -333,7 +338,7 @@ export function AppSidebar({ role }: SidebarProps) {
         <SidebarNavigationSimple
           items={items}
           footerItems={footerItems}
-          role={role}
+          role={activeRole}
         />
       </aside>
 
@@ -358,7 +363,7 @@ export function AppSidebar({ role }: SidebarProps) {
             <SidebarNavigationSimple
               items={items}
               footerItems={footerItems}
-              role={role}
+              role={activeRole}
             />
           </aside>
         </div>
@@ -375,11 +380,13 @@ export function AppLayout({
   role,
 }: {
   children: React.ReactNode;
-  role: 'customer' | 'staff' | 'facility_admin' | 'system_admin';
+  role?: 'customer' | 'staff' | 'facility_admin' | 'system_admin';
 }) {
+  const { profile } = useAuth();
+  const effectiveRole = profile?.role || role || 'customer';
   return (
     <div className="flex min-h-screen bg-surface-soft">
-      <AppSidebar role={role} />
+      <AppSidebar role={effectiveRole} />
       <main className="flex-1 min-w-0 overflow-auto">
         <div className="max-w-7xl mx-auto p-6 md:p-8">{children}</div>
       </main>

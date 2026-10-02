@@ -1,21 +1,31 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
-import { AppLayout, PageHeader } from '@/components/layout/AppSidebar';
+import { AppLayout } from '@/components/layout/AppSidebar';
 import { Button } from '@/components/ui/Button';
 import { StatCard, EmptyState } from '@/components/ui/Card';
-import { TicketStatusBadge, PriorityBadge } from '@/components/ui/Badge';
+import { TicketStatusBadge, PriorityBadge, AppointmentStatusBadge } from '@/components/ui/Badge';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { apiClient } from '@/lib/api-client';
 import { supabase } from '@/lib/supabase';
-import type { QueueTicket, QueueStats, PriorityLevel } from '@/types';
+import type { QueueTicket, QueueStats, PriorityLevel, Appointment } from '@/types';
 import toast from 'react-hot-toast';
 import {
   Phone, RotateCcw, SkipForward, Play, CheckCircle, UserX,
   Clock, Users, CheckSquare, BarChart2, Plus, Volume2, VolumeX,
-  Layers, Search, User, Sparkles, Check
+  Layers, Search, User, Sparkles, Check, Calendar, Bell, Settings,
+  AlertTriangle, ArrowRight, ShieldCheck, MonitorCheck
 } from 'lucide-react';
-import { Select, type SelectItemType } from '@/components/base/select/select';
+import { Select } from '@/components/base/select/select';
+import {
+  Skeleton,
+  StatsRowSkeleton,
+  QueueItemSkeleton,
+  ServingCardSkeleton,
+  AppointmentItemSkeleton,
+  PageSkeleton
+} from '@/components/ui/Skeleton';
 
 const COUNTERS = [
   { id: '00000000-0000-0000-0000-000000000040', name: 'Counter 1', number: 1, type: 'General Consultation' },
@@ -66,12 +76,25 @@ function playCallChime() {
 function StaffQueueDashboard() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [selectedCounterId, setSelectedCounterId] = useState(COUNTERS[0].id);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [activeTab, setActiveTab] = useState<'waiting' | 'history'>('waiting');
+  const [activeTab, setActiveTab] = useState<'waiting' | 'history'>(
+    location.pathname === '/staff/history' ? 'history' : 'waiting'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [isWalkinModalOpen, setIsWalkinModalOpen] = useState(false);
+
+  // Sync tab with path if visiting history directly
+  useEffect(() => {
+    if (location.pathname === '/staff/history') {
+      setActiveTab('history');
+    } else if (location.pathname === '/staff/queue') {
+      setActiveTab('waiting');
+    }
+  }, [location.pathname]);
 
   // Walk-in form state
   const [walkinName, setWalkinName] = useState('');
@@ -89,7 +112,7 @@ function StaffQueueDashboard() {
   const facilityId = profile?.facility_id || '00000000-0000-0000-0000-000000000010';
 
   // 1. Get today's queue session
-  const { data: sessionRes } = useQuery({
+  const { data: sessionRes, isLoading: isSessionLoading } = useQuery({
     queryKey: ['staff-session', facilityId],
     queryFn: () =>
       apiClient.get<{ success: true; data: { id: string } }>(
@@ -111,13 +134,20 @@ function StaffQueueDashboard() {
   });
 
   // 3. Get queue stats
-  const { data: statsRes } = useQuery({
+  const { data: statsRes, isLoading: isStatsLoading } = useQuery({
     queryKey: ['staff-stats', sessionId],
     queryFn: () =>
       apiClient.get<{ success: true; data: QueueStats }>(
         `/queues/${sessionId}/stats`
       ),
     refetchInterval: 15000,
+  });
+
+  // 4. Get appointments (for /staff/appointments)
+  const { data: staffAppointmentsRes, isLoading: isAppointmentsLoading } = useQuery({
+    queryKey: ['staff-appointments', facilityId],
+    queryFn: () => apiClient.get<{ success: true; data: Appointment[] }>('/appointments'),
+    enabled: location.pathname === '/staff/appointments',
   });
 
   // Realtime subscription
@@ -198,6 +228,16 @@ function StaffQueueDashboard() {
     },
   });
 
+  // Helper to check if a specific action is pending for a specific ticket
+  // This solves the bug: calling one person ONLY triggers loading on THAT ticket!
+  const isTicketActionLoading = (ticketId: string, action?: string) => {
+    if (!ticketMutation.isPending) return false;
+    const currentVars = ticketMutation.variables;
+    if (!currentVars || currentVars.ticketId !== ticketId) return false;
+    if (action && currentVars.action !== action) return false;
+    return true;
+  };
+
   // Mutation for creating walk-in ticket
   const walkinMutation = useMutation({
     mutationFn: () =>
@@ -233,14 +273,28 @@ function StaffQueueDashboard() {
     });
   };
 
+  const isInitialLoading = (isTicketsLoading || isSessionLoading) && rawTickets.length === 0;
+
   return (
     <AppLayout role="staff">
       {/* Header with Counter Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-hairline mb-6">
         <div>
-          <h1 className="text-display-xs font-semibold text-ink tracking-tight">Queue Dashboard</h1>
+          <h1 className="text-display-xs font-semibold text-ink tracking-tight">
+            {location.pathname === '/staff/counter'
+              ? 'Counter Desk Management'
+              : location.pathname === '/staff/appointments'
+              ? 'Facility Appointments'
+              : location.pathname === '/staff/history'
+              ? 'Served Tickets History'
+              : location.pathname === '/staff/notifications'
+              ? 'Staff Notifications'
+              : location.pathname === '/staff/settings'
+              ? 'Staff Settings & Preferences'
+              : 'Queue Dashboard'}
+          </h1>
           <p className="text-body-sm text-muted mt-0.5">
-            Metro General Hospital • <span className="text-ink font-medium">{profile?.full_name || 'Staff'}</span> •{' '}
+            Metro General Hospital • <span className="text-ink font-medium">{profile?.full_name || 'Dr. Jane Smith (Staff)'}</span> •{' '}
             <span className="inline-flex items-center gap-1.5 text-success font-medium">
               <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
               Online
@@ -253,10 +307,11 @@ function StaffQueueDashboard() {
           <button
             type="button"
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`h-9 px-3 rounded-lg border text-caption font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${soundEnabled
+            className={`h-9 px-3 rounded-lg border text-caption font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+              soundEnabled
                 ? 'bg-primary/10 border-primary/20 text-primary'
                 : 'bg-surface-soft border-hairline text-muted hover:text-ink'
-              }`}
+            }`}
             title={soundEnabled ? 'Chime sound active' : 'Chime muted'}
           >
             {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
@@ -295,348 +350,603 @@ function StaffQueueDashboard() {
             icon={<Plus size={14} />}
             onClick={() => setIsWalkinModalOpen(true)}
           >
-          Walk-in
+            Walk-in
           </Button>
         </div>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Waiting"
-          value={stats?.waiting ?? waitingTickets.length}
-          icon={<Clock size={16} />}
-        />
-        <StatCard
-          label="In Service"
-          value={stats?.in_service ?? (currentTicket?.status === 'in_service' ? 1 : 0)}
-          icon={<Users size={16} />}
-        />
-        <StatCard
-          label="Completed Today"
-          value={stats?.completed ?? completedTickets.length}
-          icon={<CheckSquare size={16} />}
-        />
-        <StatCard
-          label="Avg. Service"
-          value={`${stats?.avg_service_time_minutes || 12}m`}
-          icon={<BarChart2 size={16} />}
-        />
-      </div>
-
-      {/* Main Grid: Currently Serving (Left) & Waiting Queue (Right) */}
-      <div className="grid lg:grid-cols-3 gap-6 items-start">
-        {/* Left Column: Currently Serving */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-title-sm font-semibold text-ink">Currently Serving</h2>
-            <span className="text-caption text-muted font-medium">
-              {activeCounter.name}
-            </span>
+      {/* FULL SKELETON SCREEN LOADING FOR INITIAL LOAD */}
+      {isInitialLoading ? (
+        <div className="space-y-6">
+          <StatsRowSkeleton count={4} />
+          <div className="grid lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-1 space-y-4">
+              <Skeleton className="h-5 w-36" />
+              <ServingCardSkeleton />
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-8 w-64 rounded-lg" />
+                <Skeleton className="h-8 w-28 rounded-lg" />
+              </div>
+              <div className="space-y-3">
+                <QueueItemSkeleton />
+                <QueueItemSkeleton />
+                <QueueItemSkeleton />
+              </div>
+            </div>
           </div>
-
-          {currentTicket ? (
-            <div className="bg-canvas border-2 border-primary rounded-xl p-6 shadow-sm">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <p className="text-caption text-muted uppercase tracking-wider font-semibold">Active Token</p>
-                  <p className="text-4xl font-extrabold text-ink tracking-tight font-display mt-0.5">
-                    {currentTicket.ticket_number}
-                  </p>
-                </div>
-                <TicketStatusBadge status={currentTicket.status} />
-              </div>
-
-              {/* Customer details */}
-              <div className="bg-surface-soft border border-hairline rounded-lg p-3 mb-5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
-                    <User size={12} />
+        </div>
+      ) : (
+        <>
+          {/* Subview 1: COUNTER DESK (/staff/counter) */}
+          {location.pathname === '/staff/counter' && (
+            <div className="space-y-6">
+              <div className="grid md:grid-cols-3 gap-5">
+                <div className="bg-canvas border border-hairline rounded-xl p-6 shadow-2xs">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center font-bold">
+                      #{activeCounter.number}
+                    </div>
+                    <div>
+                      <h3 className="text-title-sm font-semibold text-ink">{activeCounter.name}</h3>
+                      <p className="text-caption text-muted">{activeCounter.type}</p>
+                    </div>
                   </div>
-                  <span className="text-body-sm font-semibold text-ink">
-                    {currentTicket.profiles?.full_name || 'Customer'}
-                  </span>
+                  <div className="space-y-2 text-caption border-t border-hairline pt-4">
+                    <div className="flex justify-between">
+                      <span className="text-muted">Station Status:</span>
+                      <span className="font-semibold text-success flex items-center gap-1">
+                        <Check size={12} /> Active & Ready
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted">Assigned Operator:</span>
+                      <span className="font-medium text-ink">{profile?.full_name || 'Staff'}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {currentTicket.profiles?.phone && (
-                  <p className="text-caption text-muted pl-8">
-                    Phone: {currentTicket.profiles.phone}
-                  </p>
-                )}
-
-                <div className="pt-2 border-t border-hairline/60 flex items-center justify-between text-body-sm">
-                  <span className="text-muted text-caption">Service</span>
-                  <span className="font-medium text-ink text-caption">
-                    {currentTicket.services?.name || 'General Consultation'}
-                  </span>
+                <div className="bg-canvas border border-hairline rounded-xl p-6 shadow-2xs">
+                  <h3 className="text-title-sm font-semibold text-ink mb-2">Assigned Services</h3>
+                  <p className="text-caption text-muted mb-4">Services routed directly to this desk.</p>
+                  <div className="space-y-2">
+                    {AVAILABLE_SERVICES.map((s) => (
+                      <div key={s.id} className="flex items-center justify-between p-2 rounded-lg bg-surface-soft border border-hairline text-caption">
+                        <span className="font-medium text-ink">{s.name}</span>
+                        <span className="text-muted">{s.duration} min avg</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between text-body-sm">
-                  <span className="text-muted text-caption">Priority Level</span>
-                  <PriorityBadge priority={currentTicket.priority} />
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="space-y-2.5">
-                {currentTicket.status === 'called' && (
-                  <Button
-                    className="w-full"
-                    icon={<Play size={14} />}
-                    onClick={() => handleAction('start', currentTicket.id)}
-                    isLoading={ticketMutation.isPending}
-                  >
-                    Start Service
-                  </Button>
-                )}
-
-                {currentTicket.status === 'in_service' && (
-                  <Button
-                    className="w-full bg-success hover:bg-success/90"
-                    icon={<CheckCircle size={14} />}
-                    onClick={() => handleAction('complete', currentTicket.id, true, 'Complete service')}
-                    isLoading={ticketMutation.isPending}
-                  >
-                    Complete Service
-                  </Button>
-                )}
-
-                <div className="grid grid-cols-3 gap-2 pt-1">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<RotateCcw size={12} />}
-                    onClick={() => handleAction('recall', currentTicket.id)}
-                    title="Return ticket to waiting queue"
-                  >
-                    Recall
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<SkipForward size={12} />}
-                    onClick={() => handleAction('skip', currentTicket.id, true, 'Skip ticket')}
-                    title="Skip this customer"
-                  >
-                    Skip
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={<UserX size={12} />}
-                    onClick={() => handleAction('no-show', currentTicket.id, true, 'Mark no-show')}
-                    title="Mark as absent / no-show"
-                  >
-                    No-show
-                  </Button>
+                <div className="bg-canvas border border-hairline rounded-xl p-6 shadow-2xs">
+                  <h3 className="text-title-sm font-semibold text-ink mb-2">Desk Quick Action</h3>
+                  <p className="text-caption text-muted mb-4">Immediate ticket dispatch for {activeCounter.name}.</p>
+                  {waitingTickets.length > 0 ? (
+                    <Button
+                      className="w-full"
+                      icon={<Phone size={14} />}
+                      onClick={() => handleAction('call', waitingTickets[0].id)}
+                      isLoading={isTicketActionLoading(waitingTickets[0].id, 'call')}
+                      disabled={ticketMutation.isPending}
+                    >
+                      Call Next ({waitingTickets[0].ticket_number})
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => setIsWalkinModalOpen(true)}
+                      icon={<Plus size={14} />}
+                    >
+                      Issue Walk-in
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
-          ) : (
-            <div className="bg-canvas border border-hairline rounded-xl p-8 text-center shadow-xs">
-              <div className="w-12 h-12 rounded-full bg-surface-soft border border-hairline flex items-center justify-center mx-auto mb-3 text-muted">
-                <Clock size={20} />
-              </div>
-              <p className="text-body-sm font-semibold text-ink mb-1">Counter is Available</p>
-              <p className="text-caption text-muted mb-5">
-                {waitingTickets.length > 0
-                  ? `${waitingTickets.length} customer${waitingTickets.length > 1 ? 's' : ''} in line.`
-                  : 'No customers currently waiting in the queue.'}
-              </p>
+          )}
 
-              {waitingTickets.length > 0 ? (
-                <Button
-                  className="w-full"
-                  icon={<Phone size={14} />}
-                  onClick={() => handleAction('call', waitingTickets[0].id, false, 'Call next')}
-                  isLoading={ticketMutation.isPending}
-                >
-                  Call Next Ticket ({waitingTickets[0].ticket_number})
+          {/* Subview 2: APPOINTMENTS (/staff/appointments) */}
+          {location.pathname === '/staff/appointments' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <h2 className="text-title-sm font-semibold text-ink">Today's Scheduled Appointments</h2>
+                  <p className="text-caption text-muted">Upcoming confirmed visits for this clinic.</p>
+                </div>
+                <Button size="sm" onClick={() => navigate('/staff/queue')}>
+                  Back to Queue
                 </Button>
+              </div>
+
+              {isAppointmentsLoading ? (
+                <div className="space-y-3">
+                  <AppointmentItemSkeleton />
+                  <AppointmentItemSkeleton />
+                  <AppointmentItemSkeleton />
+                </div>
+              ) : staffAppointmentsRes?.data && staffAppointmentsRes.data.length > 0 ? (
+                <div className="space-y-2.5">
+                  {staffAppointmentsRes.data.map((appt) => (
+                    <div
+                      key={appt.id}
+                      className="flex items-center justify-between bg-canvas border border-hairline rounded-xl p-4 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-10 h-10 bg-surface-soft rounded-lg flex items-center justify-center text-muted shrink-0">
+                          <Calendar size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-body-sm font-semibold text-ink">
+                              {appt.services?.name || 'General Consultation'}
+                            </span>
+                            <AppointmentStatusBadge status={appt.status} />
+                          </div>
+                          <p className="text-caption text-muted truncate mt-0.5">
+                            Booking Ref: <span className="font-mono text-ink">{appt.booking_reference}</span> • Time: {appt.start_time} - {appt.end_time}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          toast.success(`Patient checked into queue for ${appt.booking_reference}`);
+                          navigate('/staff/queue');
+                        }}
+                      >
+                        Check-in
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  icon={<Plus size={14} />}
-                  onClick={() => setIsWalkinModalOpen(true)}
-                >
-                  Issue Walk-in Ticket
-                </Button>
+                <EmptyState
+                  icon={<Calendar size={20} />}
+                  title="No Appointments Scheduled"
+                  description="All appointment sessions for today are clear or checked in."
+                />
               )}
             </div>
           )}
 
-          {/* Quick Counter Info */}
-          <div className="bg-surface-soft border border-hairline rounded-xl p-4">
-            <div className="flex items-center justify-between text-caption text-muted mb-2">
-              <span>Counter Status</span>
-              <span className="text-success font-semibold flex items-center gap-1">
-                <Check size={12} /> Active
-              </span>
-            </div>
-            <p className="text-body-sm font-semibold text-ink">{activeCounter.name}</p>
-            <p className="text-caption text-muted mt-0.5">{activeCounter.type}</p>
-          </div>
-        </div>
+          {/* Subview 3: NOTIFICATIONS (/staff/notifications) */}
+          {location.pathname === '/staff/notifications' && (
+            <div className="space-y-4 max-w-3xl">
+              <div className="bg-canvas border border-hairline rounded-xl p-6 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between border-b border-hairline pb-4">
+                  <h3 className="text-title-sm font-semibold text-ink">Staff Alerts & Broadcasts</h3>
+                  <span className="text-caption text-muted">2 unread alerts</span>
+                </div>
 
-        {/* Right Column: Queue List (Tabs: Waiting / History) */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            {/* Tabs */}
-            <div className="flex items-center gap-1 p-1 bg-surface-soft border border-hairline rounded-lg w-fit">
-              <button
-                type="button"
-                onClick={() => setActiveTab('waiting')}
-                className={`px-3 py-1 rounded-md text-caption font-medium transition-all cursor-pointer ${activeTab === 'waiting'
-                    ? 'bg-white text-ink shadow-xs'
-                    : 'text-muted hover:text-ink'
-                  }`}
-              >
-                Waiting Queue ({waitingTickets.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('history')}
-                className={`px-3 py-1 rounded-md text-caption font-medium transition-all cursor-pointer ${activeTab === 'history'
-                    ? 'bg-white text-ink shadow-xs'
-                    : 'text-muted hover:text-ink'
-                  }`}
-              >
-                Served History ({completedTickets.length})
-              </button>
-            </div>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3.5 rounded-lg bg-amber-500/10 border border-amber-200/60">
+                    <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-body-sm font-semibold text-amber-900">Priority Patient in Line</p>
+                      <p className="text-caption text-amber-800/80">Token #A014 has priority status. Counter 1 is requested to attend.</p>
+                      <span className="text-[11px] text-amber-700/60 mt-1 block">5 minutes ago</span>
+                    </div>
+                  </div>
 
-            {/* Quick Call Next if there is no current ticket */}
-            {!currentTicket && waitingTickets.length > 0 && activeTab === 'waiting' && (
-              <Button
-                size="sm"
-                icon={<Phone size={14} />}
-                onClick={() => handleAction('call', waitingTickets[0].id)}
-                isLoading={ticketMutation.isPending}
-              >
-                Call Next ({waitingTickets[0].ticket_number})
-              </Button>
-            )}
-          </div>
-
-          {/* Search box for waiting queue */}
-          {activeTab === 'waiting' && waitingTickets.length > 3 && (
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search ticket #, customer name, or service..."
-                className="w-full h-9 pl-9 pr-3 text-caption rounded-lg border border-hairline bg-canvas text-ink placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-              />
+                  <div className="flex items-start gap-3 p-3.5 rounded-lg bg-surface-soft border border-hairline">
+                    <MonitorCheck size={18} className="text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-body-sm font-semibold text-ink">Morning Queue Session Opened</p>
+                      <p className="text-caption text-muted">Daily session #SESS-2026-10-02 has been initialized with 3 counters online.</p>
+                      <span className="text-[11px] text-muted mt-1 block">1 hour ago</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* List Content */}
-          {activeTab === 'waiting' ? (
-            isTicketsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="skeleton h-18 rounded-xl" />
-                ))}
-              </div>
-            ) : filteredWaiting.length > 0 ? (
-              <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
-                {filteredWaiting.map((ticket, i) => (
-                  <div
-                    key={ticket.id}
-                    className="flex items-center justify-between bg-canvas border border-hairline hover:border-gray-300 rounded-xl p-4 transition-all shadow-2xs"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-8 h-8 bg-surface-soft border border-hairline rounded-lg flex items-center justify-center text-caption font-bold text-muted shrink-0">
-                        #{i + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-body-sm font-bold text-ink tracking-tight font-display">
-                            {ticket.ticket_number}
-                          </p>
-                          <PriorityBadge priority={ticket.priority} />
-                        </div>
-                        <p className="text-caption text-ink font-medium truncate mt-0.5">
-                          {ticket.profiles?.full_name || 'Walk-in Customer'}
-                        </p>
-                        <p className="text-caption text-muted truncate">
-                          {ticket.services?.name || 'General Consultation'} • Joined{' '}
-                          {ticket.joined_at ? new Date(ticket.joined_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<Phone size={12} />}
-                        onClick={() => handleAction('call', ticket.id)}
-                        isLoading={ticketMutation.isPending}
-                      >
-                        Call
-                      </Button>
-                    </div>
+          {/* Subview 4: SETTINGS (/staff/settings) */}
+          {location.pathname === '/staff/settings' && (
+            <div className="space-y-6 max-w-2xl">
+              <div className="bg-canvas border border-hairline rounded-xl p-6 shadow-2xs space-y-4">
+                <h3 className="text-title-sm font-semibold text-ink border-b border-hairline pb-3">
+                  Staff Counter Preferences
+                </h3>
+                <div className="space-y-3 text-body-sm">
+                  <div>
+                    <label className="text-caption font-semibold text-muted block mb-1">Operator Profile</label>
+                    <p className="text-ink font-medium">{profile?.full_name || 'Dr. Jane Smith (Staff)'}</p>
+                    <p className="text-caption text-muted">{profile?.email || 'staff@demo.com'} • Role: Staff Counter</p>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                icon={<Clock size={20} />}
-                title="Waiting Queue is Empty"
-                description={
-                  searchQuery
-                    ? 'No matching tickets found for this query.'
-                    : 'All patients and customers have been attended to.'
-                }
-              />
-            )
-          ) : (
-            /* History Tab */
-            completedTickets.length > 0 ? (
-              <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
-                {completedTickets.map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="flex items-center justify-between bg-canvas border border-hairline rounded-xl p-4 opacity-90"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-8 h-8 bg-surface-soft rounded-lg flex items-center justify-center text-caption font-semibold text-muted shrink-0">
-                        <Check size={14} className="text-success" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-body-sm font-bold text-ink">
-                            {ticket.ticket_number}
-                          </p>
-                          <TicketStatusBadge status={ticket.status} />
-                        </div>
-                        <p className="text-caption text-muted truncate mt-0.5">
-                          {ticket.profiles?.full_name || 'Customer'} • {ticket.services?.name || 'Consultation'}
-                        </p>
-                      </div>
+                  <div className="pt-2 border-t border-hairline">
+                    <label className="text-caption font-semibold text-muted block mb-1">Assigned Facility</label>
+                    <p className="text-ink font-medium">Metro General Hospital</p>
+                  </div>
+                  <div className="pt-2 border-t border-hairline flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-ink">Audio Calling Chime</p>
+                      <p className="text-caption text-muted">Play acoustic tone whenever next token is called</p>
                     </div>
-                    <span className="text-caption text-muted">
-                      {ticket.completed_at
-                        ? new Date(ticket.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : 'Completed'}
+                    <button
+                      type="button"
+                      onClick={() => setSoundEnabled(!soundEnabled)}
+                      className={`px-3 py-1.5 rounded-lg border text-caption font-semibold cursor-pointer ${
+                        soundEnabled ? 'bg-primary text-white border-primary' : 'bg-surface-soft border-hairline text-muted'
+                      }`}
+                    >
+                      {soundEnabled ? 'Enabled' : 'Muted'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Subview 5: MAIN QUEUE DASHBOARD & HISTORY TAB (/staff/queue, /staff/history, /staff) */}
+          {(location.pathname === '/staff/queue' ||
+            location.pathname === '/staff/history' ||
+            location.pathname === '/staff') && (
+            <>
+              {/* Stats row */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <StatCard
+                  label="Waiting"
+                  value={stats?.waiting ?? waitingTickets.length}
+                  icon={<Clock size={16} />}
+                />
+                <StatCard
+                  label="In Service"
+                  value={stats?.in_service ?? (currentTicket?.status === 'in_service' ? 1 : 0)}
+                  icon={<Users size={16} />}
+                />
+                <StatCard
+                  label="Completed Today"
+                  value={stats?.completed ?? completedTickets.length}
+                  icon={<CheckSquare size={16} />}
+                />
+                <StatCard
+                  label="Avg. Service"
+                  value={`${stats?.avg_service_time_minutes || 12}m`}
+                  icon={<BarChart2 size={16} />}
+                />
+              </div>
+
+              {/* Main Grid: Currently Serving (Left) & Waiting Queue (Right) */}
+              <div className="grid lg:grid-cols-3 gap-6 items-start">
+                {/* Left Column: Currently Serving */}
+                <div className="lg:col-span-1 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-title-sm font-semibold text-ink">Currently Serving</h2>
+                    <span className="text-caption text-muted font-medium">
+                      {activeCounter.name}
                     </span>
                   </div>
-                ))}
+
+                  {currentTicket ? (
+                    <div className="bg-canvas border-2 border-primary rounded-xl p-6 shadow-sm">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <p className="text-caption text-muted uppercase tracking-wider font-semibold">Active Token</p>
+                          <p className="text-4xl font-extrabold text-ink tracking-tight font-display mt-0.5">
+                            {currentTicket.ticket_number}
+                          </p>
+                        </div>
+                        <TicketStatusBadge status={currentTicket.status} />
+                      </div>
+
+                      {/* Customer details */}
+                      <div className="bg-surface-soft border border-hairline rounded-lg p-3 mb-5 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
+                            <User size={12} />
+                          </div>
+                          <span className="text-body-sm font-semibold text-ink">
+                            {currentTicket.profiles?.full_name || 'Customer'}
+                          </span>
+                        </div>
+
+                        {currentTicket.profiles?.phone && (
+                          <p className="text-caption text-muted pl-8">
+                            Phone: {currentTicket.profiles.phone}
+                          </p>
+                        )}
+
+                        <div className="pt-2 border-t border-hairline/60 flex items-center justify-between text-body-sm">
+                          <span className="text-muted text-caption">Service</span>
+                          <span className="font-medium text-ink text-caption">
+                            {currentTicket.services?.name || 'General Consultation'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-body-sm">
+                          <span className="text-muted text-caption">Priority Level</span>
+                          <PriorityBadge priority={currentTicket.priority} />
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="space-y-2.5">
+                        {currentTicket.status === 'called' && (
+                          <Button
+                            className="w-full"
+                            icon={<Play size={14} />}
+                            onClick={() => handleAction('start', currentTicket.id)}
+                            isLoading={isTicketActionLoading(currentTicket.id, 'start')}
+                            disabled={ticketMutation.isPending}
+                          >
+                            Start Service
+                          </Button>
+                        )}
+
+                        {currentTicket.status === 'in_service' && (
+                          <Button
+                            className="w-full bg-success hover:bg-success/90"
+                            icon={<CheckCircle size={14} />}
+                            onClick={() => handleAction('complete', currentTicket.id, true, 'Complete service')}
+                            isLoading={isTicketActionLoading(currentTicket.id, 'complete')}
+                            disabled={ticketMutation.isPending}
+                          >
+                            Complete Service
+                          </Button>
+                        )}
+
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<RotateCcw size={12} />}
+                            onClick={() => handleAction('recall', currentTicket.id)}
+                            isLoading={isTicketActionLoading(currentTicket.id, 'recall')}
+                            disabled={ticketMutation.isPending}
+                            title="Return ticket to waiting queue"
+                          >
+                            Recall
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<SkipForward size={12} />}
+                            onClick={() => handleAction('skip', currentTicket.id, true, 'Skip ticket')}
+                            isLoading={isTicketActionLoading(currentTicket.id, 'skip')}
+                            disabled={ticketMutation.isPending}
+                            title="Skip this customer"
+                          >
+                            Skip
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<UserX size={12} />}
+                            onClick={() => handleAction('no-show', currentTicket.id, true, 'Mark no-show')}
+                            isLoading={isTicketActionLoading(currentTicket.id, 'no-show')}
+                            disabled={ticketMutation.isPending}
+                            title="Mark as absent / no-show"
+                          >
+                            No-show
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-canvas border border-hairline rounded-xl p-8 text-center shadow-xs">
+                      <div className="w-12 h-12 rounded-full bg-surface-soft border border-hairline flex items-center justify-center mx-auto mb-3 text-muted">
+                        <Clock size={20} />
+                      </div>
+                      <p className="text-body-sm font-semibold text-ink mb-1">Counter is Available</p>
+                      <p className="text-caption text-muted mb-5">
+                        {waitingTickets.length > 0
+                          ? `${waitingTickets.length} customer${waitingTickets.length > 1 ? 's' : ''} in line.`
+                          : 'No customers currently waiting in the queue.'}
+                      </p>
+
+                      {waitingTickets.length > 0 ? (
+                        <Button
+                          className="w-full"
+                          icon={<Phone size={14} />}
+                          onClick={() => handleAction('call', waitingTickets[0].id, false, 'Call next')}
+                          isLoading={isTicketActionLoading(waitingTickets[0].id, 'call')}
+                          disabled={ticketMutation.isPending}
+                        >
+                          Call Next Ticket ({waitingTickets[0].ticket_number})
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          className="w-full"
+                          icon={<Plus size={14} />}
+                          onClick={() => setIsWalkinModalOpen(true)}
+                        >
+                          Issue Walk-in Ticket
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quick Counter Info */}
+                  <div className="bg-surface-soft border border-hairline rounded-xl p-4">
+                    <div className="flex items-center justify-between text-caption text-muted mb-2">
+                      <span>Counter Status</span>
+                      <span className="text-success font-semibold flex items-center gap-1">
+                        <Check size={12} /> Active
+                      </span>
+                    </div>
+                    <p className="text-body-sm font-semibold text-ink">{activeCounter.name}</p>
+                    <p className="text-caption text-muted mt-0.5">{activeCounter.type}</p>
+                  </div>
+                </div>
+
+                {/* Right Column: Queue List (Tabs: Waiting / History) */}
+                <div className="lg:col-span-2 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    {/* Tabs */}
+                    <div className="flex items-center gap-1 p-1 bg-surface-soft border border-hairline rounded-lg w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('waiting')}
+                        className={`px-3 py-1 rounded-md text-caption font-medium transition-all cursor-pointer ${
+                          activeTab === 'waiting'
+                            ? 'bg-white text-ink shadow-xs'
+                            : 'text-muted hover:text-ink'
+                        }`}
+                      >
+                        Waiting Queue ({waitingTickets.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('history')}
+                        className={`px-3 py-1 rounded-md text-caption font-medium transition-all cursor-pointer ${
+                          activeTab === 'history'
+                            ? 'bg-white text-ink shadow-xs'
+                            : 'text-muted hover:text-ink'
+                        }`}
+                      >
+                        Served History ({completedTickets.length})
+                      </button>
+                    </div>
+
+                    {/* Quick Call Next if there is no current ticket */}
+                    {!currentTicket && waitingTickets.length > 0 && activeTab === 'waiting' && (
+                      <Button
+                        size="sm"
+                        icon={<Phone size={14} />}
+                        onClick={() => handleAction('call', waitingTickets[0].id)}
+                        isLoading={isTicketActionLoading(waitingTickets[0].id, 'call')}
+                        disabled={ticketMutation.isPending}
+                      >
+                        Call Next ({waitingTickets[0].ticket_number})
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Search box for waiting queue */}
+                  {activeTab === 'waiting' && waitingTickets.length > 3 && (
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search ticket #, customer name, or service..."
+                        className="w-full h-9 pl-9 pr-3 text-caption rounded-lg border border-hairline bg-canvas text-ink placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                      />
+                    </div>
+                  )}
+
+                  {/* List Content */}
+                  {activeTab === 'waiting' ? (
+                    isTicketsLoading ? (
+                      <div className="space-y-3">
+                        <QueueItemSkeleton />
+                        <QueueItemSkeleton />
+                        <QueueItemSkeleton />
+                      </div>
+                    ) : filteredWaiting.length > 0 ? (
+                      <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+                        {filteredWaiting.map((ticket, i) => {
+                          // Check ONLY this ticket's calling state!
+                          const isCurrentTicketCalling = isTicketActionLoading(ticket.id, 'call');
+
+                          return (
+                            <div
+                              key={ticket.id}
+                              className="flex items-center justify-between bg-canvas border border-hairline hover:border-gray-300 rounded-xl p-4 transition-all shadow-2xs"
+                            >
+                              <div className="flex items-center gap-3.5 min-w-0">
+                                <div className="w-8 h-8 bg-surface-soft border border-hairline rounded-lg flex items-center justify-center text-caption font-bold text-muted shrink-0">
+                                  #{i + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-body-sm font-bold text-ink tracking-tight font-display">
+                                      {ticket.ticket_number}
+                                    </p>
+                                    <PriorityBadge priority={ticket.priority} />
+                                  </div>
+                                  <p className="text-caption text-ink font-medium truncate mt-0.5">
+                                    {ticket.profiles?.full_name || 'Walk-in Customer'}
+                                  </p>
+                                  <p className="text-caption text-muted truncate">
+                                    {ticket.services?.name || 'General Consultation'} • Joined{' '}
+                                    {ticket.joined_at ? new Date(ticket.joined_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  icon={<Phone size={12} />}
+                                  onClick={() => handleAction('call', ticket.id)}
+                                  isLoading={isCurrentTicketCalling}
+                                  disabled={ticketMutation.isPending}
+                                >
+                                  Call
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        icon={<Clock size={20} />}
+                        title="Waiting Queue is Empty"
+                        description={
+                          searchQuery
+                            ? 'No matching tickets found for this query.'
+                            : 'All patients and customers have been attended to.'
+                        }
+                      />
+                    )
+                  ) : (
+                    /* History Tab */
+                    completedTickets.length > 0 ? (
+                      <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+                        {completedTickets.map((ticket) => (
+                          <div
+                            key={ticket.id}
+                            className="flex items-center justify-between bg-canvas border border-hairline rounded-xl p-4 opacity-90"
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0">
+                              <div className="w-8 h-8 bg-surface-soft rounded-lg flex items-center justify-center text-caption font-semibold text-muted shrink-0">
+                                <Check size={14} className="text-success" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-body-sm font-bold text-ink">
+                                    {ticket.ticket_number}
+                                  </p>
+                                  <TicketStatusBadge status={ticket.status} />
+                                </div>
+                                <p className="text-caption text-muted truncate mt-0.5">
+                                  {ticket.profiles?.full_name || 'Customer'} • {ticket.services?.name || 'Consultation'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-caption text-muted">
+                              {ticket.completed_at
+                                ? new Date(ticket.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                : 'Completed'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        icon={<CheckSquare size={20} />}
+                        title="No completed tickets yet"
+                        description="Completed sessions will appear here as they finish."
+                      />
+                    )
+                  )}
+                </div>
               </div>
-            ) : (
-              <EmptyState
-                icon={<CheckSquare size={20} />}
-                title="No completed tickets yet"
-                description="Completed sessions will appear here as they finish."
-              />
-            )
+            </>
           )}
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Walk-in Ticket Modal */}
       <Modal
@@ -713,10 +1023,11 @@ function StaffQueueDashboard() {
                   type="button"
                   key={p}
                   onClick={() => setWalkinPriority(p)}
-                  className={`h-9 rounded-lg text-caption font-semibold capitalize border transition-all cursor-pointer ${walkinPriority === p
+                  className={`h-9 rounded-lg text-caption font-semibold capitalize border transition-all cursor-pointer ${
+                    walkinPriority === p
                       ? 'bg-primary text-white border-primary shadow-xs'
                       : 'bg-surface-soft border-hairline text-ink hover:bg-surface-strong'
-                    }`}
+                  }`}
                 >
                   {p}
                 </button>

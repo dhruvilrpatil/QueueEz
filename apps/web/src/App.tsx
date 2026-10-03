@@ -2,7 +2,6 @@ import React, { lazy, Suspense } from 'react';
 import {
   createBrowserRouter,
   RouterProvider,
-  Outlet,
   Navigate,
 } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
@@ -12,6 +11,13 @@ import { RequireAuth, RequireRole, GuestOnly } from './routes/guards';
 // ── Public pages ─────────────────────────────────────────────
 import { LandingPage } from './pages/public/LandingPage';
 import { FacilitiesPage, FacilityDetailPage } from './pages/public/FacilitiesPage';
+import {
+  AboutPage,
+  PrivacyPage,
+  TermsPage,
+  DocsPage,
+  ContactPage,
+} from './pages/public/CompanyPages';
 
 // ── Auth pages ───────────────────────────────────────────────
 import { LoginPage, RegisterPage, ForgotPasswordPage } from './pages/auth/AuthPages';
@@ -19,6 +25,9 @@ import { LoginPage, RegisterPage, ForgotPasswordPage } from './pages/auth/AuthPa
 // ── Customer pages (lazy) ────────────────────────────────────
 const CustomerDashboard = lazy(() => import('./pages/customer/Dashboard'));
 const QueueTicketPage = lazy(() => import('./pages/customer/QueuePage'));
+
+// ── Profile page (shared across all three entities) ──────────
+const ProfilePage = lazy(() => import('./pages/shared/ProfilePage'));
 
 // ── Staff pages (lazy) ──────────────────────────────────────
 const StaffQueueDashboard = lazy(() => import('./pages/staff/QueueDashboard'));
@@ -46,6 +55,11 @@ const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
   { path: '/facilities', element: <FacilitiesPage /> },
   { path: '/facilities/:facilityId', element: <FacilityDetailPage /> },
+  { path: '/about', element: <AboutPage /> },
+  { path: '/privacy', element: <PrivacyPage /> },
+  { path: '/terms', element: <TermsPage /> },
+  { path: '/docs', element: <DocsPage /> },
+  { path: '/contact', element: <ContactPage /> },
 
   // Auth routes (only for guests)
   {
@@ -121,7 +135,7 @@ const router = createBrowserRouter([
                 path: 'profile',
                 element: (
                   <Suspense fallback={<PageLoader />}>
-                    <CustomerDashboard />
+                    <ProfilePage entityRole="customer" />
                   </Suspense>
                 ),
               },
@@ -182,7 +196,15 @@ const router = createBrowserRouter([
                 path: 'settings',
                 element: (
                   <Suspense fallback={<PageLoader />}>
-                    <StaffQueueDashboard />
+                    <ProfilePage entityRole="staff" />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'profile',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <ProfilePage entityRole="staff" />
                   </Suspense>
                 ),
               },
@@ -215,6 +237,14 @@ const router = createBrowserRouter([
               { path: 'analytics', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'settings', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              {
+                path: 'profile',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <ProfilePage entityRole="facility_admin" />
+                  </Suspense>
+                ),
+              },
             ],
           },
         ],
@@ -233,6 +263,14 @@ const router = createBrowserRouter([
               { path: 'users', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'analytics', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              {
+                path: 'profile',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <ProfilePage entityRole="system_admin" />
+                  </Suspense>
+                ),
+              },
             ],
           },
         ],

@@ -101,6 +101,7 @@ const staffNavItems: NavItemType[] = [
   { label: 'Appointments', href: '/staff/appointments', icon: Calendar },
   { label: 'Served History', href: '/staff/history', icon: ClipboardList },
   { label: 'Notifications', href: '/staff/notifications', icon: Bell, badge: 2 },
+  { label: 'Profile', href: '/staff/profile', icon: User },
 ];
 
 const adminNavItems: NavItemType[] = [
@@ -112,6 +113,7 @@ const adminNavItems: NavItemType[] = [
   { label: 'Staff Directory', href: '/admin/staff', icon: Users },
   { label: 'Analytics & Reports', href: '/admin/analytics', icon: BarChart2 },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: Shield },
+  { label: 'Profile', href: '/admin/profile', icon: User },
 ];
 
 const systemNavItems: NavItemType[] = [
@@ -120,6 +122,7 @@ const systemNavItems: NavItemType[] = [
   { label: 'Users & Roles', href: '/system/users', icon: Users },
   { label: 'System Analytics', href: '/system/analytics', icon: BarChart2 },
   { label: 'Security & Logs', href: '/system/audit-logs', icon: Shield },
+  { label: 'Profile', href: '/admin/profile', icon: User },
 ];
 
 const roleNavMap: Record<string, NavItemType[]> = {
@@ -151,18 +154,17 @@ export function SidebarNavigationSimple({
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchQuery, setSearchQuery] = useState('');
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/');
   };
 
-  // Filter items by search query if any
-  const filteredItems = items.filter((item) => {
-    if (!searchQuery) return true;
-    return item.label.toLowerCase().includes(searchQuery.toLowerCase());
-  });
+  const getProfilePath = () => {
+    if (role === 'staff') return '/staff/profile';
+    if (role === 'facility_admin' || role === 'system_admin') return '/admin/profile';
+    return '/app/profile';
+  };
 
   const renderBadge = (badge?: string | number | React.ReactNode) => {
     if (!badge) return null;
@@ -187,8 +189,8 @@ export function SidebarNavigationSimple({
   return (
     <div className="flex flex-col h-full bg-canvas select-none">
       {/* ── Brand Header (QueueEz + Role Badge) ────────────────── */}
-      <div className="p-4 pb-3 border-b border-hairline">
-        <div className="flex items-center justify-between mb-3">
+      <div className="p-4 border-b border-hairline">
+        <div className="flex items-center justify-between">
           <Link
             to="/"
             className="flex items-center gap-2.5 text-title-sm font-bold text-ink tracking-tight font-display hover:opacity-90 transition-opacity"
@@ -202,23 +204,11 @@ export function SidebarNavigationSimple({
             {roleTitleMap[role] || 'Workspace'}
           </span>
         </div>
-
-        {/* Quick Search input */}
-        <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search menu..."
-            className="w-full h-8 pl-8 pr-2.5 text-xs rounded-lg border border-hairline bg-surface-soft text-ink placeholder:text-muted outline-none focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
-          />
-        </div>
       </div>
 
       {/* ── Main Scrollable Navigation Area (Flat Links, No Dropdowns) ── */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scrollbar-thin">
-        {filteredItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
 
@@ -281,19 +271,23 @@ export function SidebarNavigationSimple({
       {/* ── User Profile Footer ───────────────────────────────── */}
       <div className="p-3 border-t border-hairline bg-surface-soft/40">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+          <Link
+            to={getProfilePath()}
+            className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity cursor-pointer group"
+            title="View Profile"
+          >
             <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">
               {profile?.full_name?.charAt(0)?.toUpperCase() || 'U'}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-ink truncate leading-tight">
+              <p className="text-xs font-semibold text-ink truncate leading-tight group-hover:text-primary transition-colors">
                 {profile?.full_name || 'Demo User'}
               </p>
               <p className="text-[11px] text-muted truncate leading-tight">
                 {profile?.email || 'user@demo.com'}
               </p>
             </div>
-          </div>
+          </Link>
 
           <button
             type="button"

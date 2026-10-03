@@ -265,10 +265,140 @@ function CustomerDashboard() {
             </div>
           )}
 
-          {/* Subview 5: DASHBOARD & QUEUE VIEW (/app/dashboard, /app/queue, /app) */}
-          {(location.pathname === '/app/dashboard' ||
-            location.pathname === '/app/queue' ||
-            location.pathname === '/app') && (
+          {/* Subview: LIVE QUEUE (/app/queue) */}
+          {location.pathname === '/app/queue' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-title-md font-semibold text-ink">Virtual Queue Live Tracker</h2>
+                  <p className="text-body-sm text-muted">Monitor your real-time position and join walk-in queues nearby.</p>
+                </div>
+                <Button size="sm" onClick={handleOpenQueue}>
+                  <Plus size={14} /> Join New Queue
+                </Button>
+              </div>
+
+              {currentTicket ? (
+                <div className="bg-canvas border border-hairline rounded-2xl p-6 md:p-8 shadow-card space-y-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-hairline gap-4">
+                    <div>
+                      <span className="text-caption text-muted uppercase tracking-wider font-semibold">Active Ticket</span>
+                      <p className="text-display-md font-bold text-ink tracking-tight font-display mt-1">
+                        {currentTicket.ticket_number}
+                      </p>
+                      <p className="text-body-sm text-muted mt-0.5">
+                        {currentTicket.services?.name || 'General Medical Consultation'} • {currentTicket.facilities?.name || 'Metro General Hospital'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <TicketStatusBadge status={currentTicket.status} />
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => navigate(`/app/queue/${currentTicket.id}`)}
+                      >
+                        View Ticket QR <ArrowRight size={14} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* 4-Step Progress Tracker */}
+                  <div className="py-2">
+                    <p className="text-caption font-semibold text-muted mb-4 uppercase tracking-wider">Queue Progress</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200/80 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                          <CheckCircle size={14} /> 1. Ticket Issued
+                        </div>
+                        <p className="text-[11px] text-emerald-600">Reserved in session</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/20 space-y-1">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                          <Clock size={14} className="animate-spin" /> 2. Waiting in Line
+                        </div>
+                        <p className="text-[11px] text-muted">{currentTicket.people_ahead} people ahead</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-surface-soft border border-hairline space-y-1 opacity-70">
+                        <div className="text-xs font-semibold text-ink">3. Call to Desk</div>
+                        <p className="text-[11px] text-muted">Desk #{currentTicket.counters?.number || 1}</p>
+                      </div>
+                      <div className="p-3.5 rounded-xl bg-surface-soft border border-hairline space-y-1 opacity-70">
+                        <div className="text-xs font-semibold text-ink">4. Service Complete</div>
+                        <p className="text-[11px] text-muted">Consultation done</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Stats Row */}
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t border-hairline text-center">
+                    <div className="bg-surface-soft rounded-xl p-4">
+                      <p className="text-display-xs font-bold text-ink">{currentTicket.people_ahead}</p>
+                      <p className="text-caption text-muted mt-0.5">Patients Ahead</p>
+                    </div>
+                    <div className="bg-surface-soft rounded-xl p-4">
+                      <p className="text-display-xs font-bold text-ink">~{currentTicket.estimated_wait_minutes}m</p>
+                      <p className="text-caption text-muted mt-0.5">Estimated Wait</p>
+                    </div>
+                    <div className="bg-surface-soft rounded-xl p-4">
+                      <p className="text-body-sm font-bold text-ink mt-1">{currentTicket.counters?.name || 'Counter 1'}</p>
+                      <p className="text-caption text-muted mt-0.5">Assigned Desk</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-canvas border border-hairline rounded-2xl p-8 text-center space-y-4 max-w-xl mx-auto shadow-2xs">
+                    <div className="w-14 h-14 rounded-2xl bg-surface-card flex items-center justify-center mx-auto text-muted">
+                      <Clock size={24} />
+                    </div>
+                    <h3 className="text-title-md font-semibold text-ink">You are not currently in any queue</h3>
+                    <p className="text-body-sm text-muted">
+                      Select a facility below to join a walk-in queue, or schedule an appointment for later.
+                    </p>
+                    <Button onClick={handleOpenQueue} size="lg" icon={<Plus size={16} />}>
+                      Join a Virtual Queue
+                    </Button>
+                  </div>
+
+                  {/* Available facilities accepting live queues */}
+                  <div>
+                    <h3 className="text-title-sm font-semibold text-ink mb-3">Live Walk-in Facilities Near You</h3>
+                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {[
+                        { name: 'Metro General Hospital', dept: 'Outpatient & Triage', wait: '12 mins', waiting: 3, open: true },
+                        { name: 'City Central Polyclinic', dept: 'General Medicine', wait: '5 mins', waiting: 1, open: true },
+                        { name: 'St. Jude Specialist Center', dept: 'Cardiology Desk', wait: '25 mins', waiting: 6, open: true },
+                      ].map((fac) => (
+                        <div key={fac.name} className="bg-canvas border border-hairline rounded-xl p-5 shadow-2xs space-y-3 flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Queue Open
+                              </span>
+                              <span className="text-caption text-muted font-medium">~{fac.wait}</span>
+                            </div>
+                            <h4 className="text-body-sm font-bold text-ink">{fac.name}</h4>
+                            <p className="text-caption text-muted mt-0.5">{fac.dept}</p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="w-full"
+                            onClick={handleOpenQueue}
+                          >
+                            Join Line ({fac.waiting} waiting)
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Subview 5: DASHBOARD VIEW (/app/dashboard, /app) */}
+          {(location.pathname === '/app/dashboard' || location.pathname === '/app') && (
             <>
               {/* Quick actions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
@@ -301,12 +431,14 @@ function CustomerDashboard() {
                 </button>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-6">
+              <div className="grid lg:grid-cols-2 gap-6 items-stretch">
                 {/* Current Queue Ticket */}
-                <div>
-                  <h2 className="text-title-sm text-ink mb-3">Current Queue</h2>
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between h-9 mb-3">
+                    <h2 className="text-title-sm font-semibold text-ink">Current Queue</h2>
+                  </div>
                   {ticketLoading ? (
-                    <div className="bg-canvas border border-hairline rounded-xl p-6 space-y-4">
+                    <div className="bg-canvas border border-hairline rounded-xl p-6 space-y-4 flex-1">
                       <Skeleton className="h-4 w-24" />
                       <Skeleton className="h-10 w-32" />
                       <div className="grid grid-cols-3 gap-3">
@@ -316,7 +448,7 @@ function CustomerDashboard() {
                       </div>
                     </div>
                   ) : currentTicket ? (
-                    <div className="bg-canvas border border-hairline rounded-xl p-6">
+                    <div className="bg-canvas border border-hairline rounded-xl p-6 flex-1 flex flex-col justify-between">
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <p className="text-caption text-muted">Your ticket</p>
@@ -362,7 +494,7 @@ function CustomerDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-canvas border border-hairline rounded-xl p-6">
+                    <div className="bg-canvas border border-hairline rounded-xl p-6 flex-1 flex flex-col justify-center min-h-[340px]">
                       <EmptyState
                         icon={<Clock size={20} />}
                         title="No active queue ticket"
@@ -378,9 +510,9 @@ function CustomerDashboard() {
                 </div>
 
                 {/* Upcoming Appointments */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-title-sm text-ink">Upcoming Appointments</h2>
+                <div className="flex flex-col h-full">
+                  <div className="flex items-center justify-between h-9 mb-3">
+                    <h2 className="text-title-sm font-semibold text-ink">Upcoming Appointments</h2>
                     <Button
                       size="sm"
                       variant="ghost"
@@ -392,12 +524,12 @@ function CustomerDashboard() {
                   </div>
 
                   {apptLoading ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3 flex-1">
                       <AppointmentItemSkeleton />
                       <AppointmentItemSkeleton />
                     </div>
                   ) : upcomingAppointments.length > 0 ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3 flex-1">
                       {upcomingAppointments.slice(0, 3).map((appt) => (
                         <div
                           key={appt.id}
@@ -424,7 +556,7 @@ function CustomerDashboard() {
                       ))}
                     </div>
                   ) : (
-                    <div className="bg-canvas border border-hairline rounded-xl p-6">
+                    <div className="bg-canvas border border-hairline rounded-xl p-6 flex-1 flex flex-col justify-center min-h-[340px]">
                       <EmptyState
                         icon={<Calendar size={20} />}
                         title="No upcoming appointments"

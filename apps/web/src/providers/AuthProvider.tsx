@@ -46,6 +46,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -74,12 +75,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, fetchProfile]);
 
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!profile) return;
+    const updated: Profile = {
+      ...profile,
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    setProfile(updated);
+
+    if (profile.email && DEMO_PROFILES[profile.email]) {
+      DEMO_PROFILES[profile.email] = updated;
+    }
+    localStorage.setItem(`queueez_profile_${profile.id}`, JSON.stringify(updated));
+
+    try {
+      await apiClient.patch('/auth/me', updates);
+    } catch {
+      // Local fallback
+    }
+  };
+
   // Initialize auth state
   useEffect(() => {
     // 1. Check if demo user is stored in localStorage
     const savedDemoEmail = localStorage.getItem('ezqueue_demo_user');
     if (savedDemoEmail && DEMO_PROFILES[savedDemoEmail]) {
-      const demoProfile = DEMO_PROFILES[savedDemoEmail];
+      let demoProfile = DEMO_PROFILES[savedDemoEmail];
+      const cached = localStorage.getItem(`queueez_profile_${demoProfile.id}`);
+      if (cached) {
+        try {
+          demoProfile = { ...demoProfile, ...JSON.parse(cached) };
+        } catch {
+          // Ignore
+        }
+      }
       const mockUser = {
         id: demoProfile.id,
         email: demoProfile.email,
@@ -229,6 +259,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signOut,
         refreshProfile,
+        updateProfile,
       }}
     >
       {children}

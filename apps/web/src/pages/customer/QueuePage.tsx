@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, MapPin, AlertCircle, X, RefreshCw } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, X, RefreshCw, MessageSquare } from 'lucide-react';
 import { AppLayout, PageHeader } from '@/components/layout/AppSidebar';
 import { Button } from '@/components/ui/Button';
 import { TicketStatusBadge } from '@/components/ui/Badge';
@@ -12,12 +12,20 @@ import { supabase } from '@/lib/supabase';
 import type { QueueTicket } from '@/types';
 import toast from 'react-hot-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { NewQueryModal } from '@/components/messaging/NewQueryModal';
+import { messagingApi } from '@/features/messaging/api/messagingApi';
 
 function QueueTicketPage() {
   const { ticketId } = useParams<{ ticketId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [queryModalOpen, setQueryModalOpen] = useState(false);
+
+  const handleQuerySubmit = async (payload: any) => {
+    const res = await messagingApi.createConversation(payload);
+    navigate(`/app/messages/${res.conversation.id}`);
+  };
 
   const {
     data: ticketRes,
@@ -213,16 +221,27 @@ function QueueTicketPage() {
           </div>
         )}
 
-        {/* Cancel */}
+        {/* Actions */}
         {isActive && (
-          <Button
-            variant="secondary"
-            className="w-full"
-            icon={<X size={14} />}
-            onClick={() => setCancelOpen(true)}
-          >
-            Cancel queue
-          </Button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setQueryModalOpen(true)}
+              className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg bg-canvas border border-hairline text-ink text-xs font-semibold hover:bg-surface-soft transition-colors cursor-pointer"
+            >
+              <MessageSquare size={14} />
+              <span>Ask Staff About This Token</span>
+            </button>
+
+            <Button
+              variant="secondary"
+              className="w-full"
+              icon={<X size={14} />}
+              onClick={() => setCancelOpen(true)}
+            >
+              Cancel queue
+            </Button>
+          </div>
         )}
       </div>
 
@@ -236,6 +255,22 @@ function QueueTicketPage() {
         cancelLabel="Keep my spot"
         isDanger
         isLoading={cancelMutation.isPending}
+      />
+
+      {/* New Query Modal with pre-loaded queue context */}
+      <NewQueryModal
+        isOpen={queryModalOpen}
+        onClose={() => setQueryModalOpen(false)}
+        onSubmit={handleQuerySubmit}
+        preloadedContext={{
+          queue_ticket: {
+            id: ticket.id,
+            ticket_number: ticket.ticket_number,
+            service_name: ticket.services?.name,
+          },
+          facility_id: ticket.facility_id,
+          facility_name: ticket.facilities?.name,
+        }}
       />
     </AppLayout>
   );

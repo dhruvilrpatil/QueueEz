@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Clock, Calendar, ArrowRight, Plus, History, Bell, User, CheckCircle,
-  AlertCircle, ShieldCheck, Mail, Phone, MapPin, Sparkles
+  AlertCircle, ShieldCheck, Mail, Phone, MapPin, Sparkles, MessageSquare, MessageSquarePlus
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppSidebar';
 import { StatCard, EmptyState } from '@/components/ui/Card';
@@ -20,6 +20,8 @@ import {
   QueueItemSkeleton
 } from '@/components/ui/Skeleton';
 import { CustomerBookingWizard, WizardMode } from '@/components/customer/CustomerBookingWizard';
+import { NewQueryModal } from '@/components/messaging/NewQueryModal';
+import { messagingApi } from '@/features/messaging/api/messagingApi';
 
 function CustomerDashboard() {
   const { profile } = useAuth();
@@ -59,6 +61,20 @@ function CustomerDashboard() {
   const handleOpenAppointment = () => {
     setWizardMode('appointment');
     setWizardOpen(true);
+  };
+
+  // Customer Query Modal state
+  const [queryModalOpen, setQueryModalOpen] = useState(false);
+  const [preloadedContext, setPreloadedContext] = useState<any>(undefined);
+
+  const handleOpenQuery = (context?: any) => {
+    setPreloadedContext(context);
+    setQueryModalOpen(true);
+  };
+
+  const handleQuerySubmit = async (payload: any) => {
+    const res = await messagingApi.createConversation(payload);
+    navigate(`/app/messages/${res.conversation.id}`);
   };
 
   const greeting = () => {
@@ -154,6 +170,24 @@ function CustomerDashboard() {
                         <span className="font-mono text-caption text-muted bg-surface-soft px-2.5 py-1 rounded-md border border-hairline">
                           {appt.booking_reference}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenQuery({
+                            appointment: {
+                              id: appt.id,
+                              booking_reference: appt.booking_reference,
+                              date: appt.date,
+                              service_name: appt.services?.name,
+                            },
+                            facility_id: appt.facility_id,
+                            facility_name: appt.facilities?.name,
+                          })}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-hairline hover:bg-surface-soft text-ink transition-colors cursor-pointer"
+                          title="Ask staff a question about this appointment"
+                        >
+                          <MessageSquare size={13} />
+                          <span>Ask Staff</span>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -401,7 +435,7 @@ function CustomerDashboard() {
           {(location.pathname === '/app/dashboard' || location.pathname === '/app') && (
             <>
               {/* Quick actions */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <button
                   type="button"
                   onClick={handleOpenQueue}
@@ -427,6 +461,20 @@ function CustomerDashboard() {
                   </div>
                   <div className="w-10 h-10 bg-surface-card rounded-lg flex items-center justify-center text-muted">
                     <Calendar size={20} />
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenQuery()}
+                  className="flex items-center justify-between bg-canvas border border-hairline rounded-xl p-6 hover:bg-surface-soft transition-colors text-left cursor-pointer shadow-xs"
+                >
+                  <div>
+                    <p className="text-body-sm font-semibold text-ink mb-1">Ask a Question</p>
+                    <p className="text-caption text-muted">Direct staff & facility chat</p>
+                  </div>
+                  <div className="w-10 h-10 bg-surface-card rounded-lg flex items-center justify-center text-muted">
+                    <MessageSquarePlus size={20} />
                   </div>
                 </button>
               </div>
@@ -589,6 +637,14 @@ function CustomerDashboard() {
         isOpen={wizardOpen}
         onClose={() => setWizardOpen(false)}
         initialMode={wizardMode}
+      />
+
+      {/* ── CUSTOMER QUERY MODAL (Contextual Messaging Subsystem) ── */}
+      <NewQueryModal
+        isOpen={queryModalOpen}
+        onClose={() => setQueryModalOpen(false)}
+        onSubmit={handleQuerySubmit}
+        preloadedContext={preloadedContext}
       />
     </AppLayout>
   );

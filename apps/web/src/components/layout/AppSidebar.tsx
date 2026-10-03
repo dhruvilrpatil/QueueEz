@@ -18,9 +18,11 @@ import {
   Menu,
   X,
   Search,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
+import { useUnreadMessages } from '@/features/messaging';
 
 // ============================================================
 // TYPES
@@ -89,6 +91,7 @@ const customerNavItems: NavItemType[] = [
   { label: 'Dashboard', href: '/app/dashboard', icon: LayoutDashboard },
   { label: 'Live Queue', href: '/app/queue', icon: Clock, badge: 'Live' },
   { label: 'Appointments', href: '/app/appointments', icon: Calendar },
+  { label: 'Help & Queries', href: '/app/messages', icon: MessageSquare },
   { label: 'History', href: '/app/history', icon: ClipboardList },
   { label: 'Facilities', href: '/facilities', icon: Building2 },
   { label: 'Notifications', href: '/app/notifications', icon: Bell, badge: 3 },
@@ -99,6 +102,7 @@ const staffNavItems: NavItemType[] = [
   { label: 'Live Queue', href: '/staff/queue', icon: Clock, badge: 'Live' },
   { label: 'Counter Desk', href: '/staff/counter', icon: Layers },
   { label: 'Appointments', href: '/staff/appointments', icon: Calendar },
+  { label: 'Chat', href: '/staff/chat', icon: MessageSquare },
   { label: 'Served History', href: '/staff/history', icon: ClipboardList },
   { label: 'Notifications', href: '/staff/notifications', icon: Bell, badge: 2 },
   { label: 'Profile', href: '/staff/profile', icon: User },
@@ -111,6 +115,7 @@ const adminNavItems: NavItemType[] = [
   { label: 'Services & Depts', href: '/admin/services', icon: Layers },
   { label: 'Service Counters', href: '/admin/counters', icon: Building2 },
   { label: 'Staff Directory', href: '/admin/staff', icon: Users },
+  { label: 'Chat Oversight', href: '/admin/chat', icon: MessageSquare },
   { label: 'Analytics & Reports', href: '/admin/analytics', icon: BarChart2 },
   { label: 'Audit Logs', href: '/admin/audit-logs', icon: Shield },
   { label: 'Profile', href: '/admin/profile', icon: User },
@@ -311,7 +316,18 @@ export function AppSidebar({ role }: SidebarProps) {
   const { profile } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const activeRole = profile?.role || role;
-  const items = roleNavMap[activeRole] || customerNavItems;
+  const { unreadCount } = useUnreadMessages(15000);
+
+  const baseItems = roleNavMap[activeRole] || customerNavItems;
+  const items = baseItems.map((item) => {
+    if (item.href === '/staff/chat' || item.href === '/app/messages') {
+      return {
+        ...item,
+        badge: unreadCount > 0 ? unreadCount : undefined,
+      };
+    }
+    return item;
+  });
 
   const getFooterItems = (r: 'customer' | 'staff' | 'facility_admin' | 'system_admin'): NavItemType[] => {
     if (r === 'facility_admin' || r === 'system_admin') {
@@ -372,17 +388,23 @@ export function AppSidebar({ role }: SidebarProps) {
 export function AppLayout({
   children,
   role,
+  noPadding = false,
 }: {
   children: React.ReactNode;
   role?: 'customer' | 'staff' | 'facility_admin' | 'system_admin';
+  noPadding?: boolean;
 }) {
   const { profile } = useAuth();
   const effectiveRole = profile?.role || role || 'customer';
   return (
-    <div className="flex min-h-screen bg-surface-soft">
+    <div className="flex h-screen overflow-hidden bg-surface-soft">
       <AppSidebar role={effectiveRole} />
-      <main className="flex-1 min-w-0 overflow-auto">
-        <div className="max-w-7xl mx-auto p-6 md:p-8">{children}</div>
+      <main className="flex-1 min-w-0 overflow-auto flex flex-col">
+        {noPadding ? (
+          children
+        ) : (
+          <div className="max-w-7xl mx-auto p-6 md:p-8 w-full">{children}</div>
+        )}
       </main>
     </div>
   );

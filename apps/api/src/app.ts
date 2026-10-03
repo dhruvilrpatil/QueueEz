@@ -15,6 +15,7 @@ import appointmentRoutes from './modules/appointments/routes';
 import queueRoutes from './modules/queues/routes';
 import notificationRoutes from './modules/notifications/routes';
 import analyticsRoutes from './modules/analytics/routes';
+import messagingRoutes from './modules/messaging/routes';
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use(`${API_PREFIX}/appointments`, appointmentRoutes);
 app.use(`${API_PREFIX}/queues`, queueRoutes);
 app.use(`${API_PREFIX}/notifications`, notificationRoutes);
 app.use(`${API_PREFIX}/analytics`, analyticsRoutes);
+app.use(`${API_PREFIX}/conversations`, messagingRoutes);
 
 // ============================================================
 // ERROR HANDLING

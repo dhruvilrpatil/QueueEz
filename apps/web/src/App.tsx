@@ -35,6 +35,11 @@ const StaffQueueDashboard = lazy(() => import('./pages/staff/QueueDashboard'));
 // ── Admin pages (lazy) ──────────────────────────────────────
 const AdminOverview = lazy(() => import('./pages/admin/Overview'));
 
+// ── Messaging pages (Customer Query & Staff Messaging Subsystem) ───
+const CustomerMessagesPage = lazy(() => import('./pages/customer/MessagesPage'));
+const StaffChatPage = lazy(() => import('./pages/staff/ChatPage'));
+const AdminChatPage = lazy(() => import('./pages/admin/AdminChatPage'));
+
 import { PageSkeleton } from './components/ui/Skeleton';
 
 // Loading fallback with skeleton screen
@@ -132,6 +137,22 @@ const router = createBrowserRouter([
                 ),
               },
               {
+                path: 'messages/:conversationId',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerMessagesPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'messages',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <CustomerMessagesPage />
+                  </Suspense>
+                ),
+              },
+              {
                 path: 'profile',
                 element: (
                   <Suspense fallback={<PageLoader />}>
@@ -173,6 +194,22 @@ const router = createBrowserRouter([
                 element: (
                   <Suspense fallback={<PageLoader />}>
                     <StaffQueueDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'chat/:conversationId',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffChatPage />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'chat',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffChatPage />
                   </Suspense>
                 ),
               },
@@ -234,6 +271,14 @@ const router = createBrowserRouter([
               { path: 'services', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'counters', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'staff', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              {
+                path: 'chat',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <AdminChatPage />
+                  </Suspense>
+                ),
+              },
               { path: 'analytics', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'settings', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },

@@ -42,9 +42,16 @@ export const ConversationHeader: React.FC<ConversationHeaderProps> = ({
       {/* Title & Metadata */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap mb-1">
-          <h2 className="text-base font-semibold text-[#111111] truncate">
-            {conversation.subject}
-          </h2>
+          <div className="flex items-center gap-2 min-w-0">
+            <h2 className="text-base font-semibold text-[#111111] truncate">
+              {isStaff ? (conversation.customer?.full_name || 'Customer Query') : conversation.subject}
+            </h2>
+            {isStaff && conversation.subject && (
+              <span className="text-xs font-medium text-[#6B7280] hidden sm:inline-block max-w-[280px] truncate bg-[#F3F4F6] px-2 py-0.5 rounded">
+                {conversation.subject}
+              </span>
+            )}
+          </div>
           <ConversationStatusBadge status={conversation.status} />
           {isStaff && <PriorityBadge priority={conversation.priority} />}
         </div>

@@ -164,7 +164,34 @@ const LOCAL_MESSAGES: Message[] = [
   },
 ];
 
+const CONVERSATION_CACHE = new Map<string, Conversation>();
+const MESSAGE_CACHE = new Map<string, Message[]>();
+
+// Initialize cache with local mock conversations
+LOCAL_CONVERSATIONS.forEach((c) => CONVERSATION_CACHE.set(c.id, c));
+LOCAL_MESSAGES.forEach((m) => {
+  const existing = MESSAGE_CACHE.get(m.conversation_id) || [];
+  if (!existing.some((e) => e.id === m.id)) {
+    MESSAGE_CACHE.set(m.conversation_id, [...existing, m]);
+  }
+});
+
 export const messagingApi = {
+  /**
+   * Synchronous cache readers for instantaneous UI updates
+   */
+  getCachedConversation(id: string): Conversation | undefined {
+    return CONVERSATION_CACHE.get(id);
+  },
+
+  getCachedMessages(conversationId: string): Message[] | undefined {
+    return MESSAGE_CACHE.get(conversationId);
+  },
+
+  setCachedConversation(conversation: Conversation): void {
+    CONVERSATION_CACHE.set(conversation.id, conversation);
+  },
+
   /**
    * Fetch conversations with optional filters
    */
@@ -181,6 +208,7 @@ export const messagingApi = {
       const queryString = params.toString() ? `?${params.toString()}` : '';
       const res = await apiClient.get<ApiResponse<Conversation[]>>(`/conversations${queryString}`);
       if (res && res.data && res.data.length > 0) {
+        res.data.forEach((c) => CONVERSATION_CACHE.set(c.id, c));
         return {
           conversations: res.data,
           unreadTotal: res.meta?.unread_total || 0,
@@ -190,7 +218,8 @@ export const messagingApi = {
       // Fallback to local high-fidelity state
     }
 
-    let list = [...LOCAL_CONVERSATIONS];
+    let list = Array.from(CONVERSATION_CACHE.values());
+    if (list.length === 0) list = [...LOCAL_CONVERSATIONS];
     if (filters?.status && filters.status !== 'all') {
       list = list.filter((c) => c.status === filters.status);
     }
@@ -224,16 +253,28 @@ export const messagingApi = {
    * Get single conversation details
    */
   async getConversation(id: string): Promise<Conversation> {
+    // 1. If in cache, return immediately for instant switching
+    const cached = CONVERSATION_CACHE.get(id);
+
     try {
       const res = await apiClient.get<ApiResponse<Conversation>>(`/conversations/${id}`);
-      if (res && res.data) return res.data;
+      if (res && res.data) {
+        CONVERSATION_CACHE.set(id, res.data);
+        return res.data;
+      }
     } catch {
-      // Fallback
+      // Fallback to cache if network call fails
     }
 
+    if (cached) return cached;
+
     const found = LOCAL_CONVERSATIONS.find((c) => c.id === id);
-    if (found) return found;
-    return LOCAL_CONVERSATIONS[0];
+    if (found) {
+      CONVERSATION_CACHE.set(id, found);
+      return found;
+    }
+
+    throw new Error('Conversation not found');
   },
 
   /**
@@ -292,6 +333,8 @@ export const messagingApi = {
 
     LOCAL_CONVERSATIONS.unshift(newConv);
     LOCAL_MESSAGES.push(newMsg);
+    CONVERSATION_CACHE.set(newConv.id, newConv);
+    MESSAGE_CACHE.set(newConv.id, [newMsg]);
 
     return { conversation: newConv, message: newMsg };
   },
@@ -300,14 +343,23 @@ export const messagingApi = {
    * Fetch messages for conversation
    */
   async getMessages(conversationId: string): Promise<Message[]> {
+    const cached = MESSAGE_CACHE.get(conversationId);
+
     try {
       const res = await apiClient.get<ApiResponse<Message[]>>(`/conversations/${conversationId}/messages`);
-      if (res && res.data && res.data.length > 0) return res.data;
+      if (res && Array.isArray(res.data)) {
+        MESSAGE_CACHE.set(conversationId, res.data);
+        return res.data;
+      }
     } catch {
       // Fallback
     }
 
-    return LOCAL_MESSAGES.filter((m) => m.conversation_id === conversationId);
+    if (cached) return cached;
+
+    const localMatched = LOCAL_MESSAGES.filter((m) => m.conversation_id === conversationId);
+    MESSAGE_CACHE.set(conversationId, localMatched);
+    return localMatched;
   },
 
   /**
@@ -316,7 +368,11 @@ export const messagingApi = {
   async sendMessage(conversationId: string, payload: SendMessagePayload): Promise<Message> {
     try {
       const res = await apiClient.post<ApiResponse<Message>>(`/conversations/${conversationId}/messages`, payload);
-      if (res && res.data) return res.data;
+      if (res && res.data) {
+        const existing = MESSAGE_CACHE.get(conversationId) || [];
+        MESSAGE_CACHE.set(conversationId, [...existing, res.data]);
+        return res.data;
+      }
     } catch {
       // Fallback
     }
@@ -339,14 +395,17 @@ export const messagingApi = {
     };
 
     LOCAL_MESSAGES.push(newMsg);
+    const existing = MESSAGE_CACHE.get(conversationId) || [];
+    MESSAGE_CACHE.set(conversationId, [...existing, newMsg]);
 
-    const conv = LOCAL_CONVERSATIONS.find((c) => c.id === conversationId);
+    const conv = CONVERSATION_CACHE.get(conversationId) || LOCAL_CONVERSATIONS.find((c) => c.id === conversationId);
     if (conv) {
       conv.last_message_at = now;
       conv.last_message = newMsg;
       if (payload.message_type === 'staff_reply') {
         conv.status = 'waiting_for_customer';
       }
+      CONVERSATION_CACHE.set(conversationId, conv);
     }
 
     return newMsg;
@@ -356,15 +415,15 @@ export const messagingApi = {
    * Mark conversation as read
    */
   async markRead(conversationId: string): Promise<void> {
+    const conv = CONVERSATION_CACHE.get(conversationId);
+    if (conv) {
+      conv.unread_count = 0;
+      CONVERSATION_CACHE.set(conversationId, conv);
+    }
     try {
       await apiClient.patch<ApiResponse<{ message: string }>>(`/conversations/${conversationId}/read`);
     } catch {
-      // Fallback
-    }
-
-    const conv = LOCAL_CONVERSATIONS.find((c) => c.id === conversationId);
-    if (conv) {
-      conv.unread_count = 0;
+      // Ignored for offline
     }
   },
 

@@ -1,40 +1,173 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProvider';
 import { AppLayout, PageHeader } from '@/components/layout/AppSidebar';
 import { StatCard, EmptyState } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/api-client';
+import { supabase } from '@/lib/supabase';
 import type { FacilityAnalytics } from '@/types';
 import {
   Calendar, Clock, CheckCircle, XCircle, BarChart2, TrendingUp, Users,
   Layers, Building2, Shield, Settings, Check, UserCheck, AlertCircle,
   Plus, ArrowRight, Phone, Search, RefreshCw, FileText, Download,
   Sliders, PauseCircle, PlayCircle, Eye, AlertTriangle, Sparkles, Filter,
-  MoreVertical
+  MoreVertical, Activity, Zap, Info
 } from 'lucide-react';
 import { StatsRowSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { Table01DividerLine } from '@/components/staff/StaffDirectoryTable';
 import toast from 'react-hot-toast';
 
+const SERVICE_BREAKDOWN_DATA = [
+  {
+    id: 0,
+    range: '81-100',
+    name: 'General Medicine OPD',
+    share: '38%',
+    percent: 38,
+    volume: 148,
+    avgWait: '11m',
+    color: '#7F56D9',
+    strokeDasharray: '155.2 408.4',
+    strokeDashoffset: '0',
+    desk: 'Counters 1 & 2',
+    trend: '+4.8% vs last week',
+  },
+  {
+    id: 1,
+    range: '61-80',
+    name: 'Diagnostics & Labs',
+    share: '22%',
+    percent: 22,
+    volume: 86,
+    avgWait: '8m',
+    color: '#9E77ED',
+    strokeDasharray: '89.8 408.4',
+    strokeDashoffset: '-155.2',
+    desk: 'Desk 3',
+    trend: '+2.1% vs last week',
+  },
+  {
+    id: 2,
+    range: '41-60',
+    name: 'Pharmacy Desk',
+    share: '16%',
+    percent: 16,
+    volume: 62,
+    avgWait: '4m',
+    color: '#B692F6',
+    strokeDasharray: '65.3 408.4',
+    strokeDashoffset: '-245.0',
+    desk: 'Dispensary 1',
+    trend: '-1.4% vs last week',
+  },
+  {
+    id: 3,
+    range: '21-40',
+    name: 'Specialist Consults',
+    share: '12%',
+    percent: 12,
+    volume: 46,
+    avgWait: '18m',
+    color: '#D6BBFB',
+    strokeDasharray: '49.0 408.4',
+    strokeDashoffset: '-310.3',
+    desk: 'Cabin 4',
+    trend: '+6.2% vs last week',
+  },
+  {
+    id: 4,
+    range: '0-20',
+    name: 'Emergency & Standby',
+    share: '12%',
+    percent: 12,
+    volume: 46,
+    avgWait: '2m',
+    color: '#EAECF0',
+    strokeDasharray: '49.0 408.4',
+    strokeDashoffset: '-359.3',
+    desk: 'Triage Room',
+    trend: 'SLA Benchmark 100%',
+  },
+];
+
+const RATING_TREND_DATA = [
+  { month: 'Jan', x: 60, yourY: 100, yourScore: 78.5, indY: 162, indScore: 62.0, served: 210, sla: '94.2%' },
+  { month: 'Feb', x: 121, yourY: 98, yourScore: 79.2, indY: 160, indScore: 62.8, served: 234, sla: '95.1%' },
+  { month: 'Mar', x: 182, yourY: 94, yourScore: 81.0, indY: 155, indScore: 64.2, served: 268, sla: '95.8%' },
+  { month: 'Apr', x: 243, yourY: 90, yourScore: 82.6, indY: 148, indScore: 66.5, served: 290, sla: '96.2%' },
+  { month: 'May', x: 304, yourY: 86, yourScore: 84.0, indY: 140, indScore: 68.4, served: 315, sla: '96.5%' },
+  { month: 'Jun', x: 365, yourY: 84, yourScore: 84.8, indY: 138, indScore: 69.1, served: 308, sla: '96.0%' },
+  { month: 'Jul', x: 426, yourY: 80, yourScore: 86.5, indY: 134, indScore: 70.0, served: 340, sla: '97.1%' },
+  { month: 'Aug', x: 487, yourY: 76, yourScore: 88.0, indY: 130, indScore: 71.2, served: 355, sla: '97.4%' },
+  { month: 'Sep', x: 548, yourY: 70, yourScore: 90.2, indY: 126, indScore: 72.3, served: 372, sla: '98.0%' },
+  { month: 'Oct', x: 609, yourY: 66, yourScore: 91.8, indY: 120, indScore: 73.8, served: 395, sla: '98.5%' },
+  { month: 'Nov', x: 670, yourY: 62, yourScore: 93.4, indY: 114, indScore: 75.1, served: 388, sla: '98.2%' },
+  { month: 'Dec', x: 730, yourY: 52, yourScore: 96.0, indY: 106, indScore: 77.0, served: 412, sla: '99.1%' },
+];
+
 function AdminOverview() {
   const { profile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const facilityId = profile?.facility_id || '00000000-0000-0000-0000-000000000010';
 
-  const { data: analyticsRes, isLoading } = useQuery({
+  // Real-time query fetching every 3 seconds
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
+  const { data: analyticsRes, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['admin-analytics', facilityId],
-    queryFn: () =>
-      apiClient.get<{ success: true; data: FacilityAnalytics }>(
+    queryFn: async () => {
+      const res = await apiClient.get<{ success: true; data: FacilityAnalytics }>(
         `/analytics/facility/${facilityId}?period=7d`
-      ),
+      );
+      setLastSyncTime(new Date());
+      return res;
+    },
     enabled: !!facilityId,
+    refetchInterval: 3000,
+    refetchIntervalInBackground: true,
   });
 
   const analytics = analyticsRes?.data;
+
+  // Supabase real-time channel subscription for immediate updates
+  useEffect(() => {
+    try {
+      const channel = supabase
+        .channel(`admin-overview-${facilityId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'queue_tickets' },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-analytics', facilityId] });
+            setLastSyncTime(new Date());
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'appointments' },
+          () => {
+            queryClient.invalidateQueries({ queryKey: ['admin-analytics', facilityId] });
+            setLastSyncTime(new Date());
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      // Offline fallback
+    }
+  }, [facilityId, queryClient]);
+
+  // Interactive Hover States
+  const [hoveredDonutSlice, setHoveredDonutSlice] = useState<number | null>(null);
+  const [hoveredMonthIndex, setHoveredMonthIndex] = useState<number | null>(9); // default Oct
+  const lineChartSvgRef = useRef<SVGSVGElement | null>(null);
 
   // Filter states
   const [appointmentFilter, setAppointmentFilter] = useState('all');
@@ -658,12 +791,37 @@ function AdminOverview() {
           {/* ── Default Overview Dashboard (/admin/overview) matching Image 2 ── */}
           {location.pathname === '/admin/overview' && (
             <div className="space-y-6">
-              {/* 1. Header Bar matching Image 2 */}
+              {/* 1. Header Bar with Real-Time Live Sync Status */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2">
-                <h1 className="text-display-xs sm:text-title-lg font-bold text-ink font-display tracking-tight">
-                  Organization overview
-                </h1>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-display-xs sm:text-title-lg font-bold text-ink font-display tracking-tight">
+                      Organization overview
+                    </h1>
+                    {/* Real-time Streaming Status Badge */}
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="font-semibold">Live Real-Time Sync</span>
+                    </div>
+                  </div>
+                  <p className="text-caption text-muted mt-0.5">
+                    Live operational metrics • Auto-refreshes every 3s • Last synced {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </p>
+                </div>
+
                 <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+                  <button
+                    onClick={() => {
+                      refetch();
+                      toast.success('Real-time data refreshed');
+                    }}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-ink bg-canvas border border-hairline rounded-lg shadow-xs hover:bg-surface-soft hover:border-border transition-colors cursor-pointer"
+                    title="Force immediate sync"
+                  >
+                    <RefreshCw size={14} className={isFetching ? 'animate-spin text-primary' : 'text-muted'} />
+                    <span>Sync Now</span>
+                  </button>
+
                   <button
                     onClick={() => toast('Active filters: Last 12 months • All healthcare services • SLA benchmarks', { icon: '🔍' })}
                     className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-ink bg-canvas border border-hairline rounded-lg shadow-xs hover:bg-surface-soft hover:border-border transition-colors cursor-pointer"
@@ -691,14 +849,17 @@ function AdminOverview() {
                 </div>
               </div>
 
-              {/* 2. Main Two-Card Grid matching Image 2 */}
+              {/* 2. Main Two-Card Grid with Rich Hover Data Visuals */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                {/* ── CARD 1: Service Breakdown (Donut Chart) ── */}
+                {/* ── CARD 1: Service Breakdown (Interactive Donut Chart with Hover Visual) ── */}
                 <div className="lg:col-span-5 bg-canvas border border-hairline rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between">
                   <div>
                     {/* Header */}
                     <div className="flex items-center justify-between p-6 pb-2">
-                      <h2 className="text-base font-bold text-ink">Service breakdown</h2>
+                      <div>
+                        <h2 className="text-base font-bold text-ink">Service breakdown</h2>
+                        <p className="text-caption text-muted mt-0.5">5 departments • Real-time patient volume share</p>
+                      </div>
                       <button
                         onClick={() => toast('Service breakdown report options', { icon: 'ℹ️' })}
                         className="text-muted hover:text-ink p-1 rounded-md hover:bg-surface-soft transition-colors cursor-pointer"
@@ -710,104 +871,132 @@ function AdminOverview() {
 
                     {/* Donut Chart & Legend Body */}
                     <div className="p-6 pt-4 flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-6">
-                      {/* SVG Donut */}
+                      {/* SVG Donut with Center Data Visual & Hover Expansion */}
                       <div className="relative w-44 h-44 sm:w-48 sm:h-48 shrink-0 flex items-center justify-center">
                         <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90 transform">
-                          {/* Slices calculated from radius 65, circumference 408.4 */}
-                          {/* Slice 1: 81-100 (38%) #7F56D9 */}
-                          <circle
-                            cx="100"
-                            cy="100"
-                            r="65"
-                            fill="transparent"
-                            stroke="#7F56D9"
-                            strokeWidth="32"
-                            strokeDasharray="155.2 408.4"
-                            strokeDashoffset="0"
-                            className="transition-all duration-300 hover:opacity-90 cursor-pointer"
-                          />
-                          {/* Slice 2: 61-80 (22%) #9E77ED */}
-                          <circle
-                            cx="100"
-                            cy="100"
-                            r="65"
-                            fill="transparent"
-                            stroke="#9E77ED"
-                            strokeWidth="32"
-                            strokeDasharray="89.8 408.4"
-                            strokeDashoffset="-155.2"
-                            className="transition-all duration-300 hover:opacity-90 cursor-pointer"
-                          />
-                          {/* Slice 3: 41-60 (16%) #B692F6 */}
-                          <circle
-                            cx="100"
-                            cy="100"
-                            r="65"
-                            fill="transparent"
-                            stroke="#B692F6"
-                            strokeWidth="32"
-                            strokeDasharray="65.3 408.4"
-                            strokeDashoffset="-245.0"
-                            className="transition-all duration-300 hover:opacity-90 cursor-pointer"
-                          />
-                          {/* Slice 4: 21-40 (12%) #D6BBFB */}
-                          <circle
-                            cx="100"
-                            cy="100"
-                            r="65"
-                            fill="transparent"
-                            stroke="#D6BBFB"
-                            strokeWidth="32"
-                            strokeDasharray="49.0 408.4"
-                            strokeDashoffset="-310.3"
-                            className="transition-all duration-300 hover:opacity-90 cursor-pointer"
-                          />
-                          {/* Slice 5: 0-20 (12%) #EAECF0 */}
-                          <circle
-                            cx="100"
-                            cy="100"
-                            r="65"
-                            fill="transparent"
-                            stroke="#EAECF0"
-                            strokeWidth="32"
-                            strokeDasharray="49.0 408.4"
-                            strokeDashoffset="-359.3"
-                            className="transition-all duration-300 hover:opacity-90 cursor-pointer"
-                          />
+                          {SERVICE_BREAKDOWN_DATA.map((slice) => {
+                            const isHovered = hoveredDonutSlice === slice.id;
+                            return (
+                              <circle
+                                key={slice.id}
+                                cx="100"
+                                cy="100"
+                                r="65"
+                                fill="transparent"
+                                stroke={slice.color}
+                                strokeWidth={isHovered ? 38 : 32}
+                                strokeDasharray={slice.strokeDasharray}
+                                strokeDashoffset={slice.strokeDashoffset}
+                                onMouseEnter={() => setHoveredDonutSlice(slice.id)}
+                                onMouseLeave={() => setHoveredDonutSlice(null)}
+                                className="transition-all duration-200 cursor-pointer"
+                                style={{
+                                  filter: isHovered ? `drop-shadow(0 0 6px ${slice.color}80)` : 'none',
+                                  opacity: hoveredDonutSlice === null || isHovered ? 1 : 0.6,
+                                }}
+                              />
+                            );
+                          })}
+
                           {/* Inner clean cutout */}
-                          <circle cx="100" cy="100" r="49" fill="white" />
+                          <circle cx="100" cy="100" r="46" fill="white" />
                         </svg>
+
+                        {/* Center Hover Dynamic Data Visual */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
+                          {hoveredDonutSlice !== null ? (
+                            (() => {
+                              const active = SERVICE_BREAKDOWN_DATA[hoveredDonutSlice];
+                              return (
+                                <div className="animate-in fade-in zoom-in-95 duration-150">
+                                  <p className="text-xl sm:text-2xl font-black text-ink leading-tight">
+                                    {active.share}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-muted uppercase tracking-wider truncate max-w-[80px]">
+                                    {active.range}
+                                  </p>
+                                  <p className="text-[10px] font-semibold text-primary">
+                                    {active.volume} pts
+                                  </p>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <div>
+                              <p className="text-xs text-muted uppercase font-bold tracking-wider">Total</p>
+                              <p className="text-xl sm:text-2xl font-extrabold text-ink leading-tight">388</p>
+                              <p className="text-[10px] text-muted">Patients</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                      {/* Legend Column matching Image 2 */}
-                      <div className="flex flex-col gap-2.5 sm:min-w-[130px]">
-                        {[
-                          { label: '81-100', name: 'General Medicine OPD', share: '38%', color: '#7F56D9' },
-                          { label: '61-80', name: 'Diagnostics & Labs', share: '22%', color: '#9E77ED' },
-                          { label: '41-60', name: 'Pharmacy Desk', share: '16%', color: '#B692F6' },
-                          { label: '21-40', name: 'Specialist Consults', share: '12%', color: '#D6BBFB' },
-                          { label: '0-20', name: 'Emergency & Standby', share: '12%', color: '#EAECF0' },
-                        ].map((item) => (
-                          <div
-                            key={item.label}
-                            className="flex items-center gap-2.5 group cursor-pointer"
-                            onClick={() => toast(`${item.name} (${item.label}): ${item.share} of total patient queue volume`, { icon: '📊' })}
-                          >
-                            <span
-                              className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/5"
-                              style={{ backgroundColor: item.color }}
-                            />
-                            <span className="text-body-sm font-medium text-ink group-hover:text-primary transition-colors">
-                              {item.label}
-                            </span>
-                          </div>
-                        ))}
+                      {/* Legend Column with Interactive Hover Highlight */}
+                      <div className="flex flex-col gap-2.5 sm:min-w-[130px] w-full sm:w-auto">
+                        {SERVICE_BREAKDOWN_DATA.map((item) => {
+                          const isHovered = hoveredDonutSlice === item.id;
+                          return (
+                            <div
+                              key={item.id}
+                              onMouseEnter={() => setHoveredDonutSlice(item.id)}
+                              onMouseLeave={() => setHoveredDonutSlice(null)}
+                              className={`flex items-center justify-between sm:justify-start gap-2.5 px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                isHovered ? 'bg-surface-soft ring-1 ring-[#7F56D9]/30 scale-[1.02]' : 'hover:bg-surface-soft/60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-black/5"
+                                  style={{ backgroundColor: item.color }}
+                                />
+                                <span className="text-body-sm font-medium text-ink">
+                                  {item.range}
+                                </span>
+                              </div>
+                              <span className="text-xs font-semibold text-muted ml-auto sm:ml-2">
+                                {item.share}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
+                    </div>
+
+                    {/* Interactive Hover Data Visual Detail Card */}
+                    <div className="px-6 pb-2">
+                      {hoveredDonutSlice !== null ? (
+                        (() => {
+                          const active = SERVICE_BREAKDOWN_DATA[hoveredDonutSlice];
+                          return (
+                            <div className="p-3 bg-surface-soft/70 border border-hairline rounded-xl flex items-center justify-between text-xs animate-in fade-in duration-150">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: active.color }} />
+                                <div>
+                                  <p className="font-bold text-ink truncate">{active.name}</p>
+                                  <p className="text-muted text-[11px]">{active.desk} • {active.avgWait} wait</p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <span className="font-extrabold text-ink">{active.volume} patients</span>
+                                <p className="text-[10px] text-emerald-600 font-semibold">{active.trend}</p>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="p-2.5 bg-surface-soft/40 border border-hairline-soft rounded-xl text-center text-caption text-muted">
+                          Hover over any slice or category above to inspect patient volume & wait time
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Card Footer matching Image 2 */}
-                  <div className="p-4 border-t border-hairline flex items-center justify-end">
+                  <div className="p-4 border-t border-hairline flex items-center justify-between">
+                    <span className="text-caption text-muted flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Live counter throughput
+                    </span>
                     <button
                       onClick={() => navigate('/admin/analytics')}
                       className="px-4 py-2 text-sm font-semibold text-ink bg-canvas border border-hairline rounded-lg shadow-xs hover:bg-surface-soft hover:border-border transition-colors cursor-pointer"
@@ -817,15 +1006,20 @@ function AdminOverview() {
                   </div>
                 </div>
 
-                {/* ── CARD 2: Average Service Rating (Dual-Line Trend) ── */}
+                {/* ── CARD 2: Average Service Rating (Dual-Line Trend with Interactive Scrubber & Hover Tooltip) ── */}
                 <div className="lg:col-span-7 bg-canvas border border-hairline rounded-2xl shadow-xs overflow-hidden flex flex-col justify-between p-6">
                   <div>
                     {/* Header */}
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <h2 className="text-base font-bold text-ink">Average service rating</h2>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-bold text-ink">Average service rating</h2>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                            +18.0 vs benchmark
+                          </span>
+                        </div>
                         <p className="text-caption text-muted mt-0.5">
-                          Track how your rating compares to your industry average.
+                          Track how your rating compares to your industry average. Hover any month to inspect exact metrics.
                         </p>
                       </div>
                       <button
@@ -837,22 +1031,35 @@ function AdminOverview() {
                       </button>
                     </div>
 
-                    {/* Legend placed top-right below description */}
-                    <div className="flex items-center justify-end gap-5 mt-2 mb-4 text-caption font-medium text-muted">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#7F56D9]" />
-                        <span className="text-ink font-semibold">Your rating</span>
+                    {/* Legend placed top-right below description with active month indicator */}
+                    <div className="flex items-center justify-between gap-4 mt-2 mb-3 flex-wrap">
+                      <div className="text-xs text-muted">
+                        Active Inspection:{' '}
+                        <strong className="text-ink">
+                          {hoveredMonthIndex !== null ? `${RATING_TREND_DATA[hoveredMonthIndex].month} 2026` : 'Hover to inspect'}
+                        </strong>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#D6BBFB]" />
-                        <span>Industry average</span>
+
+                      <div className="flex items-center gap-5 text-caption font-medium text-muted">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#7F56D9]" />
+                          <span className="text-ink font-semibold">Your rating</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#D6BBFB]" />
+                          <span>Industry average</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Dual Line Curve SVG Chart */}
-                    <div className="w-full overflow-x-auto">
-                      <div className="min-w-[540px]">
-                        <svg viewBox="0 0 760 250" className="w-full h-auto select-none">
+                    {/* Dual Line Curve SVG Chart with Interactive Scrubber */}
+                    <div className="w-full overflow-x-auto relative">
+                      <div className="min-w-[540px] relative">
+                        <svg
+                          ref={lineChartSvgRef}
+                          viewBox="0 0 760 250"
+                          className="w-full h-auto select-none"
+                        >
                           {/* Y Axis Title rotated */}
                           <text
                             x="-115"
@@ -892,7 +1099,7 @@ function AdminOverview() {
                             </g>
                           ))}
 
-                          {/* Fine vertical hatched lines below the curve replicating Image 2 */}
+                          {/* Fine vertical hatched lines below the curve */}
                           {Array.from({ length: 68 }).map((_, i) => {
                             const x = 60 + i * 10;
                             const normX = (x - 60) / 670;
@@ -928,31 +1135,86 @@ function AdminOverview() {
                             strokeLinecap="round"
                           />
 
-                          {/* X Axis Months */}
-                          {[
-                            { m: 'Jan', x: 60 },
-                            { m: 'Feb', x: 121 },
-                            { m: 'Mar', x: 182 },
-                            { m: 'Apr', x: 243 },
-                            { m: 'May', x: 304 },
-                            { m: 'Jun', x: 365 },
-                            { m: 'Jul', x: 426 },
-                            { m: 'Aug', x: 487 },
-                            { m: 'Sep', x: 548 },
-                            { m: 'Oct', x: 609 },
-                            { m: 'Nov', x: 670 },
-                            { m: 'Dec', x: 730 },
-                          ].map((item) => (
-                            <text
-                              key={item.m}
-                              x={item.x}
-                              y="230"
-                              textAnchor="middle"
-                              className="fill-muted text-[11px] font-medium"
-                            >
-                              {item.m}
-                            </text>
-                          ))}
+                          {/* ── Interactive Scrubber & Hover Visual Overlay ── */}
+                          {hoveredMonthIndex !== null && (() => {
+                            const pt = RATING_TREND_DATA[hoveredMonthIndex];
+                            return (
+                              <g className="transition-all duration-150">
+                                {/* Vertical Guideline */}
+                                <line
+                                  x1={pt.x}
+                                  y1={20}
+                                  x2={pt.x}
+                                  y2={212}
+                                  stroke="#7F56D9"
+                                  strokeWidth="1.5"
+                                  strokeDasharray="4 3"
+                                  opacity="0.8"
+                                />
+
+                                {/* Industry Avg Glow Dot */}
+                                <circle
+                                  cx={pt.x}
+                                  cy={pt.indY}
+                                  r="5"
+                                  fill="#D6BBFB"
+                                  stroke="#ffffff"
+                                  strokeWidth="2"
+                                  className="transition-all duration-150"
+                                />
+
+                                {/* Your Rating Outer Halo */}
+                                <circle
+                                  cx={pt.x}
+                                  cy={pt.yourY}
+                                  r="10"
+                                  fill="#7F56D9"
+                                  opacity="0.2"
+                                />
+                                {/* Your Rating Inner Crisp Dot */}
+                                <circle
+                                  cx={pt.x}
+                                  cy={pt.yourY}
+                                  r="5.5"
+                                  fill="#7F56D9"
+                                  stroke="#ffffff"
+                                  strokeWidth="2.5"
+                                  className="transition-all duration-150"
+                                />
+                              </g>
+                            );
+                          })()}
+
+                          {/* X Axis Months & Transparent Interactive Columns */}
+                          {RATING_TREND_DATA.map((item, idx) => {
+                            const isHovered = hoveredMonthIndex === idx;
+                            return (
+                              <g key={item.month}>
+                                {/* Month Label */}
+                                <text
+                                  x={item.x}
+                                  y="230"
+                                  textAnchor="middle"
+                                  className={`text-[11px] font-medium transition-colors cursor-pointer ${
+                                    isHovered ? 'fill-primary font-bold' : 'fill-muted'
+                                  }`}
+                                >
+                                  {item.month}
+                                </text>
+
+                                {/* Transparent hover hit zone covering the column */}
+                                <rect
+                                  x={item.x - 28}
+                                  y="15"
+                                  width="56"
+                                  height="220"
+                                  fill="transparent"
+                                  className="cursor-pointer"
+                                  onMouseEnter={() => setHoveredMonthIndex(idx)}
+                                />
+                              </g>
+                            );
+                          })}
 
                           {/* X Axis Title */}
                           <text
@@ -966,6 +1228,39 @@ function AdminOverview() {
                         </svg>
                       </div>
                     </div>
+
+                    {/* Floating Hover Data Visual Info Panel */}
+                    {hoveredMonthIndex !== null && (() => {
+                      const pt = RATING_TREND_DATA[hoveredMonthIndex];
+                      const diff = (pt.yourScore - pt.indScore).toFixed(1);
+                      return (
+                        <div className="mt-3 p-3 bg-surface-soft/80 border border-hairline rounded-xl flex items-center justify-between flex-wrap gap-4 text-xs animate-in fade-in duration-150">
+                          <div className="flex items-center gap-3">
+                            <span className="px-2 py-1 rounded-md font-bold bg-[#111111] text-white">
+                              {pt.month} 2026
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-[#7F56D9]" />
+                              <span>Your Rating: <strong className="text-ink text-sm">{pt.yourScore}</strong>/100</span>
+                              <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
+                                +{diff} pts
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-muted">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-[#D6BBFB]" />
+                              <span>Industry Avg: <strong className="text-ink">{pt.indScore}</strong></span>
+                            </div>
+                            <span className="text-hairline">|</span>
+                            <span>SLA: <strong className="text-ink">{pt.sla}</strong></span>
+                            <span className="text-hairline">|</span>
+                            <span>Volume: <strong className="text-ink">{pt.served} served</strong></span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

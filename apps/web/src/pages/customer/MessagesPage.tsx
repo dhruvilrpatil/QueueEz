@@ -42,11 +42,12 @@ export const MessagesPage: React.FC = () => {
   } = useConversations();
 
   // Active conversation hook
+  const activeConversation = conversations.find((c) => c.id === conversationId);
   const {
     conversation,
     loading: conversationLoading,
     refresh: refreshConversation,
-  } = useConversation(conversationId);
+  } = useConversation(conversationId, activeConversation);
 
   // Messages hook
   const {

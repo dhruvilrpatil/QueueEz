@@ -3,10 +3,31 @@ import { Message, SendMessagePayload } from '../types';
 import { messagingApi } from '../api/messagingApi';
 
 export function useMessages(conversationId: string | undefined, currentUserId?: string) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (conversationId) return messagingApi.getCachedMessages(conversationId) || [];
+    return [];
+  });
+  const [loading, setLoading] = useState<boolean>(() => {
+    if (conversationId && messagingApi.getCachedMessages(conversationId)) return false;
+    return !!conversationId;
+  });
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState<boolean>(false);
+
+  // Sync immediately when conversationId changes
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+
+    const cached = messagingApi.getCachedMessages(conversationId);
+    if (cached) {
+      setMessages(cached);
+      setLoading(false);
+    }
+  }, [conversationId]);
 
   const fetchMessages = useCallback(async () => {
     if (!conversationId) {
@@ -16,7 +37,10 @@ export function useMessages(conversationId: string | undefined, currentUserId?: 
     }
 
     try {
-      setLoading(true);
+      const cached = messagingApi.getCachedMessages(conversationId);
+      if (!cached) {
+        setLoading(true);
+      }
       setError(null);
       const data = await messagingApi.getMessages(conversationId);
       setMessages(data);

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { Message, Conversation } from '../types';
 
@@ -12,6 +12,9 @@ export function useMessagingRealtime(
   conversationId: string | undefined,
   callbacks: RealtimeCallbacks
 ) {
+  const callbacksRef = useRef(callbacks);
+  callbacksRef.current = callbacks;
+
   useEffect(() => {
     if (!conversationId) return;
 
@@ -29,8 +32,8 @@ export function useMessagingRealtime(
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          if (callbacks.onNewMessage && payload.new) {
-            callbacks.onNewMessage(payload.new as Message);
+          if (callbacksRef.current.onNewMessage && payload.new) {
+            callbacksRef.current.onNewMessage(payload.new as Message);
           }
         }
       )
@@ -43,8 +46,8 @@ export function useMessagingRealtime(
           filter: `conversation_id=eq.${conversationId}`,
         },
         (payload) => {
-          if (callbacks.onMessageUpdated && payload.new) {
-            callbacks.onMessageUpdated(payload.new as Message);
+          if (callbacksRef.current.onMessageUpdated && payload.new) {
+            callbacksRef.current.onMessageUpdated(payload.new as Message);
           }
         }
       )
@@ -57,8 +60,8 @@ export function useMessagingRealtime(
           filter: `id=eq.${conversationId}`,
         },
         (payload) => {
-          if (callbacks.onConversationUpdated && payload.new) {
-            callbacks.onConversationUpdated(payload.new as Partial<Conversation>);
+          if (callbacksRef.current.onConversationUpdated && payload.new) {
+            callbacksRef.current.onConversationUpdated(payload.new as Partial<Conversation>);
           }
         }
       )
@@ -72,5 +75,5 @@ export function useMessagingRealtime(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId, callbacks]);
+  }, [conversationId]);
 }

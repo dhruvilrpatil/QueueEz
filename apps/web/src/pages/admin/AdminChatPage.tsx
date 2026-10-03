@@ -67,11 +67,17 @@ export const AdminChatPage: React.FC = () => {
               <span>Refresh</span>
             </button>
             <button
-              onClick={() => navigate('/staff/chat')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#111111] hover:bg-[#242424] rounded-lg shadow-xs transition-colors"
+              onClick={() => {
+                if (conversations.length > 0) {
+                  navigate(`/admin/chat/${conversations[0].id}`);
+                } else {
+                  navigate('/admin/chat');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[#111111] hover:bg-[#242424] rounded-lg shadow-xs transition-colors cursor-pointer"
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>Open Staff Chat Workspace</span>
+              <span>Open Chat Workspace</span>
             </button>
           </div>
         </div>
@@ -251,8 +257,8 @@ export const AdminChatPage: React.FC = () => {
 
                       <td className="px-4 py-3.5 text-right">
                         <button
-                          onClick={() => navigate(`/staff/chat/${c.id}`)}
-                          className="px-3 py-1 bg-[#111111] hover:bg-[#242424] text-white rounded-md text-xs font-semibold shadow-xs transition-colors"
+                          onClick={() => navigate(`/admin/chat/${c.id}`)}
+                          className="px-3 py-1 bg-[#111111] hover:bg-[#242424] text-white rounded-md text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                         >
                           Inspect
                         </button>

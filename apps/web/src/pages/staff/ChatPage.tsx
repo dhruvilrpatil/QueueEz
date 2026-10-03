@@ -24,7 +24,11 @@ import { AppLayout } from '@/components/layout/AppSidebar';
 export const ChatPage: React.FC = () => {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+
+  const isAdmin = profile?.role === 'facility_admin' || profile?.role === 'system_admin';
+  const basePath = isAdmin ? '/admin/chat' : '/staff/chat';
+  const effectiveRole = isAdmin ? profile.role : 'staff';
 
   const [showContextPanel, setShowContextPanel] = useState(true);
   const [replyTarget, setReplyTarget] = useState<any>(null);
@@ -39,6 +43,9 @@ export const ChatPage: React.FC = () => {
     setConversations,
   } = useConversations();
 
+  // Find preloaded conversation from loaded list for instantaneous transition
+  const activeConversation = conversations.find((c) => c.id === conversationId);
+
   // Active conversation details
   const {
     conversation,
@@ -47,7 +54,7 @@ export const ChatPage: React.FC = () => {
     updatePriority,
     assignStaff,
     refresh: refreshConversation,
-  } = useConversation(conversationId);
+  } = useConversation(conversationId, activeConversation);
 
   // Messages
   const {
@@ -63,7 +70,7 @@ export const ChatPage: React.FC = () => {
   const { markRead } = useMarkConversationRead();
 
   // Typing indicator
-  const currentUserName = user?.user_metadata?.full_name || 'Staff Member';
+  const currentUserName = user?.user_metadata?.full_name || (isAdmin ? 'Admin' : 'Staff Member');
   const { typingUsers, sendTyping } = useTypingIndicator(conversationId, currentUserName);
 
   // Mark read upon opening conversation
@@ -92,7 +99,7 @@ export const ChatPage: React.FC = () => {
   });
 
   const handleSelectConversation = (c: Conversation) => {
-    navigate(`/staff/chat/${c.id}`);
+    navigate(`${basePath}/${c.id}`);
   };
 
   const handleAssignToMe = async () => {
@@ -103,12 +110,14 @@ export const ChatPage: React.FC = () => {
   };
 
   return (
-    <AppLayout role="staff" noPadding>
+    <AppLayout role={effectiveRole} noPadding>
       <div className="h-full flex flex-col bg-[#F8F9FA] overflow-hidden">
       {/* Top Bar */}
       <div className="px-6 py-3.5 bg-white border-b border-[#E5E7EB] flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-[#111111] tracking-tight">Staff Chat & Queries</h1>
+          <h1 className="text-xl font-bold text-[#111111] tracking-tight">
+            {isAdmin ? 'Facility Chat & Queries Oversight' : 'Staff Chat & Queries'}
+          </h1>
           <p className="text-xs text-[#6B7280]">
             Manage patient inquiries, appointment clarifications, and queue questions
           </p>
@@ -116,7 +125,7 @@ export const ChatPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => refreshList()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#111111] bg-[#F8F9FA] hover:bg-[#E5E7EB] rounded-lg border border-[#E5E7EB] transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#111111] bg-[#F8F9FA] hover:bg-[#E5E7EB] rounded-lg border border-[#E5E7EB] transition-colors cursor-pointer"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Refresh</span>
@@ -155,7 +164,7 @@ export const ChatPage: React.FC = () => {
               {/* Back button on mobile */}
               <div className="md:hidden px-3 py-2 border-b border-[#E5E7EB] bg-[#F8F9FA]">
                 <button
-                  onClick={() => navigate('/staff/chat')}
+                  onClick={() => navigate(basePath)}
                   className="inline-flex items-center gap-1 text-xs font-semibold text-[#111111]"
                 >
                   <ArrowLeft className="w-4 h-4" />

@@ -165,9 +165,9 @@ const router = createBrowserRouter([
         ],
       },
 
-      // Staff routes (strictly staff)
+      // Staff routes (staff and supervisory admins)
       {
-        element: <RequireRole roles={['staff']} />,
+        element: <RequireRole roles={['staff', 'facility_admin', 'system_admin']} />,
         children: [
           {
             path: '/staff',
@@ -271,6 +271,14 @@ const router = createBrowserRouter([
               { path: 'services', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'counters', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'staff', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              {
+                path: 'chat/:conversationId',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffChatPage />
+                  </Suspense>
+                ),
+              },
               {
                 path: 'chat',
                 element: (

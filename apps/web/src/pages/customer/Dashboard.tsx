@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   Clock, Calendar, ArrowRight, Plus, History, Bell, User, CheckCircle,
-  AlertCircle, ShieldCheck, Mail, Phone, MapPin, Sparkles, MessageSquare, MessageSquarePlus
+  AlertCircle, ShieldCheck, Mail, Phone, MapPin, Sparkles, MessageSquare, MessageSquarePlus, X
 } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppSidebar';
 import { StatCard, EmptyState } from '@/components/ui/Card';
@@ -20,6 +20,7 @@ import {
   QueueItemSkeleton
 } from '@/components/ui/Skeleton';
 import { CustomerBookingWizard, WizardMode } from '@/components/customer/CustomerBookingWizard';
+import { RescheduleModal, CancelModal } from '@/features/booking';
 import { NewQueryModal } from '@/components/messaging/NewQueryModal';
 import { messagingApi } from '@/features/messaging/api/messagingApi';
 
@@ -52,15 +53,42 @@ function CustomerDashboard() {
   // Wizard state for multi-step Join Queue and Book Appointment
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardMode, setWizardMode] = useState<WizardMode>('queue');
+  const [bookingContext, setBookingContext] = useState<{ facilityId?: string; serviceId?: string } | undefined>(undefined);
 
-  const handleOpenQueue = () => {
+  // Reschedule & Cancel states
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [apptToReschedule, setApptToReschedule] = useState<Appointment | null>(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [apptToCancel, setApptToCancel] = useState<Appointment | null>(null);
+
+  const handleOpenQueue = (ctx?: { facilityId?: string; serviceId?: string } | React.MouseEvent) => {
+    if (ctx && typeof ctx === 'object' && 'facilityId' in ctx) {
+      setBookingContext(ctx as { facilityId?: string; serviceId?: string });
+    } else {
+      setBookingContext(undefined);
+    }
     setWizardMode('queue');
     setWizardOpen(true);
   };
 
-  const handleOpenAppointment = () => {
+  const handleOpenAppointment = (ctx?: { facilityId?: string; serviceId?: string } | React.MouseEvent) => {
+    if (ctx && typeof ctx === 'object' && 'facilityId' in ctx) {
+      setBookingContext(ctx as { facilityId?: string; serviceId?: string });
+    } else {
+      setBookingContext(undefined);
+    }
     setWizardMode('appointment');
     setWizardOpen(true);
+  };
+
+  const handleOpenReschedule = (appt: Appointment) => {
+    setApptToReschedule(appt);
+    setRescheduleModalOpen(true);
+  };
+
+  const handleOpenCancel = (appt: Appointment) => {
+    setApptToCancel(appt);
+    setCancelModalOpen(true);
   };
 
   // Customer Query Modal state
@@ -99,7 +127,7 @@ function CustomerDashboard() {
             ? 'Profile & Preferences'
             : location.pathname === '/app/queue'
             ? 'Virtual Queue Status'
-            : `${greeting()}, ${profile?.full_name?.split(' ')[0] || 'there'} 👋`}
+            : `${greeting()}, ${profile?.full_name?.split(' ')[0] || 'there'}`}
         </h1>
         <p className="text-body-sm text-muted mt-1">
           {format(new Date(), 'EEEE, MMMM d, yyyy')}
@@ -141,9 +169,14 @@ function CustomerDashboard() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <p className="text-body-sm text-muted">Manage your upcoming and past facility appointments.</p>
-                <Button size="sm" onClick={handleOpenAppointment}>
-                  <Plus size={14} /> Book New Appointment
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => navigate('/app/book')}>
+                    <Calendar size={14} /> Guided Booking
+                  </Button>
+                  <Button size="sm" onClick={() => handleOpenAppointment()}>
+                    <Plus size={14} /> Book Appointment
+                  </Button>
+                </div>
               </div>
 
               {upcomingAppointments.length > 0 ? (
@@ -166,10 +199,28 @@ function CustomerDashboard() {
                           <Calendar size={12} /> {format(new Date(appt.date), 'EEEE, MMMM d, yyyy')} • {appt.start_time}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-caption text-muted bg-surface-soft px-2.5 py-1 rounded-md border border-hairline">
                           {appt.booking_reference}
                         </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReschedule(appt)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-hairline hover:bg-surface-soft text-ink transition-colors cursor-pointer"
+                          title="Reschedule this appointment"
+                        >
+                          <Calendar size={13} />
+                          <span>Reschedule</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenCancel(appt)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-md border border-red-200 hover:bg-red-50 text-red-600 transition-colors cursor-pointer"
+                          title="Cancel this appointment"
+                        >
+                          <X size={13} />
+                          <span>Cancel</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleOpenQuery({
@@ -225,7 +276,16 @@ function CustomerDashboard() {
                         </div>
                         <p className="text-caption text-muted mt-0.5">{appt.facilities?.name || 'Clinic'} • Ref: {appt.booking_reference}</p>
                       </div>
-                      <span className="text-caption text-muted">{format(new Date(appt.date), 'MMM d, yyyy')}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-caption text-muted">{format(new Date(appt.date), 'MMM d, yyyy')}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAppointment({ facilityId: appt.facility_id, serviceId: appt.service_id })}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-md border border-hairline hover:bg-surface-soft text-ink transition-colors cursor-pointer"
+                        >
+                          Book Again
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -635,8 +695,33 @@ function CustomerDashboard() {
       {/* ── PROGRESS STEP WIZARD MODAL (Join Queue & Book Appointment) ── */}
       <CustomerBookingWizard
         isOpen={wizardOpen}
-        onClose={() => setWizardOpen(false)}
+        onClose={() => {
+          setWizardOpen(false);
+          setBookingContext(undefined);
+        }}
         initialMode={wizardMode}
+        initialFacilityId={bookingContext?.facilityId}
+        initialServiceId={bookingContext?.serviceId}
+      />
+
+      {/* ── RESCHEDULE APPOINTMENT MODAL ── */}
+      <RescheduleModal
+        isOpen={rescheduleModalOpen}
+        onClose={() => {
+          setRescheduleModalOpen(false);
+          setApptToReschedule(null);
+        }}
+        appointment={apptToReschedule}
+      />
+
+      {/* ── CANCEL APPOINTMENT MODAL ── */}
+      <CancelModal
+        isOpen={cancelModalOpen}
+        onClose={() => {
+          setCancelModalOpen(false);
+          setApptToCancel(null);
+        }}
+        appointment={apptToCancel}
       />
 
       {/* ── CUSTOMER QUERY MODAL (Contextual Messaging Subsystem) ── */}

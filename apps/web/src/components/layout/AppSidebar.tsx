@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation, Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import {
@@ -19,10 +19,14 @@ import {
   X,
   Search,
   MessageSquare,
+  Camera,
+  Tv,
   type LucideIcon,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useAuth } from '@/providers/AuthProvider';
 import { useUnreadMessages } from '@/features/messaging';
+import { supabase } from '@/lib/supabase';
 
 // ============================================================
 // TYPES
@@ -103,6 +107,7 @@ const staffNavItems: NavItemType[] = [
   { label: 'Counter Desk', href: '/staff/counter', icon: Layers },
   { label: 'Appointments', href: '/staff/appointments', icon: Calendar },
   { label: 'Chat', href: '/staff/chat', icon: MessageSquare },
+  { label: 'TV Display', href: '/staff/queue-display', icon: Tv },
   { label: 'Served History', href: '/staff/history', icon: ClipboardList },
   { label: 'Notifications', href: '/staff/notifications', icon: Bell, badge: 2 },
   { label: 'Profile', href: '/staff/profile', icon: User },
@@ -156,9 +161,20 @@ export function SidebarNavigationSimple({
   footerItems?: NavItemType[];
   role: 'customer' | 'staff' | 'facility_admin' | 'system_admin';
 }) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, updateProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageError, setImageError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const currentAvatar =
+    profile?.avatar_url ||
+    (profile?.id ? localStorage.getItem(`queueez_avatar_${profile.id}`) : null);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [profile?.avatar_url, profile?.id]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -169,6 +185,59 @@ export function SidebarNavigationSimple({
     if (role === 'staff') return '/staff/profile';
     if (role === 'facility_admin' || role === 'system_admin') return '/admin/profile';
     return '/app/profile';
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file (PNG, JPG, SVG, or GIF)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be under 5MB');
+      return;
+    }
+
+    setIsUploading(true);
+    const toastId = toast.loading('Updating profile picture...');
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const result = event.target?.result as string;
+        if (!result) {
+          setIsUploading(false);
+          toast.dismiss(toastId);
+          return;
+        }
+
+        setImageError(false);
+        if (profile?.id) {
+          localStorage.setItem(`queueez_avatar_${profile.id}`, result);
+          try {
+            await supabase
+              .from('profiles')
+              .update({ avatar_url: result, updated_at: new Date().toISOString() })
+              .eq('id', profile.id);
+          } catch {
+            // Local fallback
+          }
+        }
+        await updateProfile({ avatar_url: result });
+        setIsUploading(false);
+        toast.success('Profile picture updated!', { id: toastId });
+      };
+      reader.onerror = () => {
+        setIsUploading(false);
+        toast.error('Failed to read file', { id: toastId });
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsUploading(false);
+      toast.error('Failed to update picture', { id: toastId });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const renderBadge = (badge?: string | number | React.ReactNode) => {
@@ -275,24 +344,65 @@ export function SidebarNavigationSimple({
 
       {/* ── User Profile Footer ───────────────────────────────── */}
       <div className="p-3 border-t border-hairline bg-surface-soft/40">
+        {/* Hidden input for direct profile picture upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png, image/jpeg, image/jpg, image/gif, image/svg+xml, image/webp"
+          className="hidden"
+          onChange={handleAvatarChange}
+        />
+
         <div className="flex items-center justify-between gap-2">
-          <Link
-            to={getProfilePath()}
-            className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity cursor-pointer group"
-            title="View Profile"
-          >
-            <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold shrink-0">
-              {profile?.full_name?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
-            <div className="min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {/* Clickable Profile Picture with Camera Hover Overlay */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              title="Click to change profile picture"
+              aria-label="Change profile picture"
+              className="relative w-8 h-8 rounded-full shrink-0 group/avatar cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20 overflow-hidden border border-hairline shadow-2xs"
+            >
+              {currentAvatar && !imageError ? (
+                <img
+                  src={currentAvatar}
+                  alt={profile?.full_name || 'Profile'}
+                  onError={() => setImageError(true)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+                  {profile?.full_name?.charAt(0)?.toUpperCase() || 'U'}
+                </div>
+              )}
+
+              {/* Hover overlay with Camera icon */}
+              <div className="absolute inset-0 bg-ink/60 text-white flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                <Camera size={13} className="text-white drop-shadow-xs" />
+              </div>
+
+              {isUploading && (
+                <div className="absolute inset-0 bg-ink/75 flex items-center justify-center">
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+            </button>
+
+            {/* Profile Info - Clicking navigates to Profile Settings */}
+            <Link
+              to={getProfilePath()}
+              className="min-w-0 flex-1 hover:opacity-80 transition-opacity cursor-pointer group"
+              title="View Profile Settings"
+            >
               <p className="text-xs font-semibold text-ink truncate leading-tight group-hover:text-primary transition-colors">
                 {profile?.full_name || 'Demo User'}
               </p>
               <p className="text-[11px] text-muted truncate leading-tight">
                 {profile?.email || 'user@demo.com'}
               </p>
-            </div>
-          </Link>
+            </Link>
+          </div>
 
           <button
             type="button"

@@ -9,6 +9,8 @@ import { useAuth } from '@/providers/AuthProvider';
 import { apiClient } from '@/lib/api-client';
 import toast from 'react-hot-toast';
 import { format, addDays } from 'date-fns';
+import { BookingWizard } from '@/features/booking';
+import type { BookingResult } from '@/features/booking';
 
 export type WizardMode = 'queue' | 'appointment';
 
@@ -16,6 +18,10 @@ export interface CustomerBookingWizardProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: WizardMode;
+  initialFacilityId?: string;
+  initialServiceId?: string;
+  initialDate?: string;
+  initialNotes?: string;
   onSuccess?: (type: WizardMode, result: any) => void;
 }
 
@@ -26,45 +32,36 @@ const QUEUE_STEPS: StepItem[] = [
   { number: 4, title: 'Confirm ticket', description: 'Generate token' },
 ];
 
-const APPOINTMENT_STEPS: StepItem[] = [
-  { number: 1, title: 'Your details', description: 'Name and contact' },
-  { number: 2, title: 'Facility & doctor', description: 'Specialty & doctor' },
-  { number: 3, title: 'Date & Time slot', description: 'Pick available slot' },
-  { number: 4, title: 'Review & confirm', description: 'Lock appointment' },
-];
-
 const FACILITIES_LIST = [
   {
     id: '00000000-0000-0000-0000-000000000010',
     name: 'Metro General Hospital',
     address: '100 Medical Center Dr, Metro City',
     services: [
-      { id: 'srv-1', name: 'General Consultation', avgWait: '12m', doctor: 'Dr. Jane Smith' },
-      { id: 'srv-2', name: 'Cardiology Specialist', avgWait: '25m', doctor: 'Dr. Marcus Vance' },
-      { id: 'srv-3', name: 'Diagnostic Lab & Blood Test', avgWait: '8m', doctor: 'David Kim' },
-      { id: 'srv-4', name: 'Pharmacy & Dispensary', avgWait: '5m', doctor: 'Front Counter' },
+      { id: '00000000-0000-0000-0000-000000000020', name: 'General Consultation', avgWait: '12m', doctor: 'Dr. Jane Smith' },
+      { id: '00000000-0000-0000-0000-000000000021', name: 'Specialist Consultation', avgWait: '25m', doctor: 'Dr. Marcus Vance' },
+      { id: '00000000-0000-0000-0000-000000000025', name: 'Diagnostic Lab & Blood Test', avgWait: '8m', doctor: 'David Kim' },
     ],
   },
   {
     id: '00000000-0000-0000-0000-000000000011',
-    name: 'City Specialty Clinic',
-    address: '45 Health Avenue, Suite 200',
+    name: 'National Bank – Main Branch',
+    address: '1 Bank Street, Fort, Mumbai',
     services: [
-      { id: 'srv-5', name: 'Preventive Health & Triage', avgWait: '10m', doctor: 'Sarah Jenkins, RN' },
-      { id: 'srv-6', name: 'Pediatrics & Child Care', avgWait: '15m', doctor: 'Dr. Emily Chen' },
+      { id: '00000000-0000-0000-0000-000000000022', name: 'Account Opening', avgWait: '10m', doctor: 'Desk A' },
+      { id: '00000000-0000-0000-0000-000000000023', name: 'Loan Application', avgWait: '20m', doctor: 'Desk B' },
     ],
   },
-];
-
-const TIME_SLOTS = [
-  '09:00 AM', '09:30 AM', '10:15 AM', '11:00 AM',
-  '11:45 AM', '02:00 PM', '02:45 PM', '03:30 PM', '04:15 PM'
 ];
 
 export function CustomerBookingWizard({
   isOpen,
   onClose,
-  initialMode = 'queue',
+  initialMode = 'appointment',
+  initialFacilityId,
+  initialServiceId,
+  initialDate,
+  initialNotes,
   onSuccess,
 }: CustomerBookingWizardProps) {
   const { profile, user } = useAuth();
@@ -75,17 +72,17 @@ export function CustomerBookingWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedResult, setCompletedResult] = useState<any | null>(null);
 
-  // Form State
+  // Form State for Queue Mode
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     email: '',
-    facilityId: FACILITIES_LIST[0].id,
-    serviceId: FACILITIES_LIST[0].services[0].id,
+    facilityId: initialFacilityId || FACILITIES_LIST[0].id,
+    serviceId: initialServiceId || FACILITIES_LIST[0].services[0].id,
     priority: 'normal',
-    notes: '',
-    appointmentDate: format(addDays(new Date(), 1), 'yyyy-MM-dd'),
-    appointmentTime: '10:15 AM',
+    notes: initialNotes || '',
+    appointmentDate: initialDate || format(addDays(new Date(), 1), 'yyyy-MM-dd'),
+    appointmentTime: '10:00',
     visitType: 'in_person',
   });
 
@@ -110,19 +107,40 @@ export function CustomerBookingWizard({
         fullName: pfpName || prev.fullName,
         email: pfpEmail || prev.email,
         phone: pfpPhone || prev.phone,
+        facilityId: initialFacilityId || prev.facilityId,
+        serviceId: initialServiceId || prev.serviceId,
+        notes: initialNotes || prev.notes,
+        appointmentDate: initialDate || prev.appointmentDate,
       }));
     }
-  }, [isOpen, initialMode, profile, user]);
+  }, [isOpen, initialMode, initialFacilityId, initialServiceId, initialDate, initialNotes, profile, user]);
 
   if (!isOpen) return null;
 
+  // ── IF MODE IS APPOINTMENT: Use the Redesigned 3-Step Booking Flow ─────────
+  if (mode === 'appointment') {
+    return (
+      <BookingWizard
+        isOpen={isOpen}
+        onClose={onClose}
+        isModal={true}
+        initialFacilityId={initialFacilityId || formData.facilityId}
+        initialServiceId={initialServiceId}
+        initialDate={initialDate || formData.appointmentDate}
+        initialNotes={initialNotes || formData.notes}
+        onSuccess={(apptResult: BookingResult) => {
+          onSuccess?.('appointment', apptResult);
+        }}
+      />
+    );
+  }
+
+  // ── IF MODE IS QUEUE: Virtual Queue Flow ──────────────────────────────────
   const currentFacility =
     FACILITIES_LIST.find((f) => f.id === formData.facilityId) || FACILITIES_LIST[0];
   const currentService =
     currentFacility.services.find((s) => s.id === formData.serviceId) ||
     currentFacility.services[0];
-
-  const steps = mode === 'queue' ? QUEUE_STEPS : APPOINTMENT_STEPS;
 
   const handleNext = () => {
     if (currentStep === 1) {
@@ -146,98 +164,52 @@ export function CustomerBookingWizard({
     }
   };
 
-  const handleComplete = async () => {
+  const handleCompleteQueue = async () => {
     setIsSubmitting(true);
     try {
-      if (mode === 'queue') {
-        const ticketNumber = `Q-${Math.floor(100 + Math.random() * 900)}`;
-        const newTicket = {
-          id: `ticket-${Date.now()}`,
-          ticket_number: ticketNumber,
-          status: 'waiting',
-          priority_level: formData.priority,
-          people_ahead: 1,
-          estimated_wait_minutes: parseInt(currentService.avgWait) || 12,
-          created_at: new Date().toISOString(),
-          facilities: {
-            name: currentFacility.name,
-            address: currentFacility.address,
-          },
-          services: {
-            name: currentService.name,
-          },
-          counters: {
-            name: 'Counter 1',
-          },
-        };
+      const ticketNumber = `Q-${Math.floor(100 + Math.random() * 900)}`;
+      const newTicket = {
+        id: `ticket-${Date.now()}`,
+        ticket_number: ticketNumber,
+        status: 'waiting',
+        priority_level: formData.priority,
+        people_ahead: 1,
+        estimated_wait_minutes: parseInt(currentService.avgWait) || 12,
+        created_at: new Date().toISOString(),
+        facilities: {
+          name: currentFacility.name,
+          address: currentFacility.address,
+        },
+        services: {
+          name: currentService.name,
+        },
+        counters: {
+          name: 'Counter 1',
+        },
+      };
 
-        // Try API, fallback smoothly
-        try {
-          await apiClient.post('/queues/tickets', {
-            facility_id: formData.facilityId,
-            service_id: formData.serviceId,
-            priority: formData.priority,
-            notes: formData.notes,
-            patient_name: formData.fullName,
-            phone: formData.phone,
-          });
-        } catch {
-          // Mock mode fallback
-        }
-
-        // Instantly update query cache
-        queryClient.setQueryData(['active-ticket'], {
-          success: true,
-          data: [newTicket],
+      try {
+        await apiClient.post('/queues/tickets', {
+          facility_id: formData.facilityId,
+          service_id: formData.serviceId,
+          priority: formData.priority,
+          notes: formData.notes,
+          patient_name: formData.fullName,
+          phone: formData.phone,
         });
-        queryClient.invalidateQueries({ queryKey: ['active-ticket'] });
-
-        setCompletedResult(newTicket);
-        toast.success(`Joined queue! Your ticket is ${ticketNumber}`);
-        onSuccess?.('queue', newTicket);
-      } else {
-        const bookingRef = `APT-${Math.floor(1000 + Math.random() * 9000)}`;
-        const newAppointment = {
-          id: `appt-${Date.now()}`,
-          booking_reference: bookingRef,
-          status: 'scheduled',
-          date: formData.appointmentDate,
-          start_time: formData.appointmentTime,
-          end_time: '11:00 AM',
-          facilities: {
-            name: currentFacility.name,
-            address: currentFacility.address,
-          },
-          services: {
-            name: currentService.name,
-          },
-        };
-
-        // Try API, fallback smoothly
-        try {
-          await apiClient.post('/appointments', {
-            facility_id: formData.facilityId,
-            service_id: formData.serviceId,
-            date: formData.appointmentDate,
-            start_time: formData.appointmentTime,
-            notes: formData.notes,
-            patient_name: formData.fullName,
-          });
-        } catch {
-          // Mock mode fallback
-        }
-
-        // Instantly update query cache
-        queryClient.setQueryData(['appointments', 'upcoming'], (old: any) => {
-          const prev = old?.data || [];
-          return { success: true, data: [newAppointment, ...prev] };
-        });
-        queryClient.invalidateQueries({ queryKey: ['appointments'] });
-
-        setCompletedResult(newAppointment);
-        toast.success(`Appointment booked! Ref: ${bookingRef}`);
-        onSuccess?.('appointment', newAppointment);
+      } catch {
+        // Fallback smoothly
       }
+
+      queryClient.setQueryData(['active-ticket'], {
+        success: true,
+        data: [newTicket],
+      });
+      queryClient.invalidateQueries({ queryKey: ['active-ticket'] });
+
+      setCompletedResult(newTicket);
+      toast.success(`Joined queue! Your ticket is ${ticketNumber}`);
+      onSuccess?.('queue', newTicket);
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit request');
     } finally {
@@ -248,20 +220,18 @@ export function CustomerBookingWizard({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-canvas border border-hairline rounded-2xl w-full max-w-2xl overflow-hidden shadow-xl animate-in fade-in zoom-in-95 duration-150 my-6">
-        {/* Header with Close and Mode Switcher */}
+        {/* Header */}
         <div className="p-5 sm:p-6 border-b border-hairline flex items-center justify-between bg-surface-soft/40">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-              {mode === 'queue' ? <Clock size={20} /> : <Calendar size={20} />}
+              <Clock size={20} />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-bold text-ink tracking-tight font-display">
-                {mode === 'queue' ? 'Join Virtual Queue' : 'Book Facility Appointment'}
+                Join Virtual Queue
               </h2>
               <p className="text-xs text-muted">
-                {mode === 'queue'
-                  ? 'Real-time walk-in queuing with live wait estimates'
-                  : 'Guaranteed reserved slot with specialist confirmation'}
+                Real-time walk-in queuing with live wait estimates
               </p>
             </div>
           </div>
@@ -275,17 +245,16 @@ export function CustomerBookingWizard({
           </button>
         </div>
 
-        {/* ── PROGRESS STEPPER SECTION (Matches Image 2 Desktop & Image 3 Mobile) ── */}
+        {/* Progress Stepper */}
         {!completedResult && (
           <div className="px-5 sm:px-8 pt-6 pb-4 bg-canvas border-b border-hairline-soft">
-            <ProgressSteps steps={steps} currentStep={currentStep} />
+            <ProgressSteps steps={QUEUE_STEPS} currentStep={currentStep} />
           </div>
         )}
 
-        {/* ── STEP CONTENT BODY ────────────────────────────────────────── */}
+        {/* Body */}
         <div className="p-5 sm:p-8">
           {completedResult ? (
-            /* ── SUCCESS VIEW ─────────────────────────────────────── */
             <div className="text-center py-6 space-y-5">
               <div className="w-16 h-16 rounded-full bg-[#12B76A]/10 text-[#12B76A] flex items-center justify-center mx-auto ring-8 ring-[#12B76A]/10">
                 <Check size={32} strokeWidth={3} />
@@ -293,12 +262,10 @@ export function CustomerBookingWizard({
 
               <div>
                 <h3 className="text-2xl font-bold text-ink font-display">
-                  {mode === 'queue' ? 'You are in line!' : 'Appointment Confirmed!'}
+                  You are in line!
                 </h3>
                 <p className="text-sm text-muted mt-1 max-w-md mx-auto">
-                  {mode === 'queue'
-                    ? 'Your token has been issued. You will receive live updates as your turn approaches.'
-                    : 'Your appointment is booked. Please arrive 10 minutes prior to your scheduled time.'}
+                  Your token has been issued. You will receive live updates as your turn approaches.
                 </p>
               </div>
 
@@ -306,7 +273,7 @@ export function CustomerBookingWizard({
               <div className="bg-surface-soft border border-hairline rounded-xl p-5 max-w-sm mx-auto text-left space-y-3">
                 <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                   <span className="text-xs font-semibold text-muted uppercase tracking-wider">
-                    {mode === 'queue' ? 'Ticket Number' : 'Booking Reference'}
+                    Ticket Number
                   </span>
                   <span className="text-xs font-bold text-[#12B76A] bg-[#12B76A]/10 px-2 py-0.5 rounded-full">
                     Confirmed
@@ -315,9 +282,7 @@ export function CustomerBookingWizard({
 
                 <div className="text-center py-2">
                   <span className="text-3xl font-extrabold text-ink font-display tracking-tight">
-                    {mode === 'queue'
-                      ? completedResult.ticket_number
-                      : completedResult.booking_reference}
+                    {completedResult.ticket_number}
                   </span>
                 </div>
 
@@ -334,17 +299,10 @@ export function CustomerBookingWizard({
                     <span>Service:</span>
                     <strong className="text-ink">{currentService.name}</strong>
                   </div>
-                  {mode === 'queue' ? (
-                    <div className="flex justify-between">
-                      <span>Wait Time:</span>
-                      <strong className="text-ink">~{completedResult.estimated_wait_minutes} mins</strong>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between">
-                      <span>Slot:</span>
-                      <strong className="text-ink">{formData.appointmentDate} at {formData.appointmentTime}</strong>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span>Wait Time:</span>
+                    <strong className="text-ink">~{completedResult.estimated_wait_minutes} mins</strong>
+                  </div>
                 </div>
               </div>
 
@@ -360,7 +318,6 @@ export function CustomerBookingWizard({
             </div>
           ) : (
             <>
-              {/* ── STEP 1: YOUR DETAILS ─────────────────────────────── */}
               {currentStep === 1 && (
                 <div className="space-y-4">
                   <div className="mb-4">
@@ -421,7 +378,6 @@ export function CustomerBookingWizard({
                 </div>
               )}
 
-              {/* ── STEP 2: SELECT FACILITY & SERVICE ─────────────────── */}
               {currentStep === 2 && (
                 <div className="space-y-4">
                   <div className="mb-4">
@@ -494,8 +450,7 @@ export function CustomerBookingWizard({
                 </div>
               )}
 
-              {/* ── STEP 3: QUEUE PREFERENCES OR APPOINTMENT SLOT ─────── */}
-              {currentStep === 3 && mode === 'queue' && (
+              {currentStep === 3 && (
                 <div className="space-y-4">
                   <div className="mb-4">
                     <h3 className="text-base font-semibold text-ink">Visit Category & Notes</h3>
@@ -535,89 +490,19 @@ export function CustomerBookingWizard({
                       rows={3}
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="e.g. Fever since 2 days, routine blood pressure checkup..."
+                      placeholder="e.g. Routine consultation, checkup..."
                       className="w-full p-3 rounded-lg border border-hairline text-sm text-ink outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 bg-white resize-none"
                     />
                   </div>
                 </div>
               )}
 
-              {currentStep === 3 && mode === 'appointment' && (
-                <div className="space-y-4">
-                  <div className="mb-4">
-                    <h3 className="text-base font-semibold text-ink">Select Date & Preferred Time</h3>
-                    <p className="text-xs text-muted">
-                      Choose an available consultation slot with {currentService.doctor}.
-                    </p>
-                  </div>
-
-                  {/* Date selection shortcuts */}
-                  <div>
-                    <label className="text-xs font-semibold text-ink block mb-1.5">Choose Date</label>
-                    <div className="grid grid-cols-3 gap-2 mb-2">
-                      {[1, 2, 3].map((daysAhead) => {
-                        const targetDate = addDays(new Date(), daysAhead);
-                        const formatted = format(targetDate, 'yyyy-MM-dd');
-                        const isSelected = formData.appointmentDate === formatted;
-                        return (
-                          <button
-                            key={daysAhead}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, appointmentDate: formatted })}
-                            className={`p-2.5 rounded-lg border text-center transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-[#12B76A] bg-[#12B76A]/5 text-[#12B76A] font-semibold'
-                                : 'border-hairline bg-white hover:bg-surface-soft text-ink'
-                            }`}
-                          >
-                            <span className="block text-xs font-bold">{format(targetDate, 'EEE, MMM d')}</span>
-                            <span className="block text-[10px] text-muted">{daysAhead === 1 ? 'Tomorrow' : `In ${daysAhead} days`}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <input
-                      type="date"
-                      value={formData.appointmentDate}
-                      onChange={(e) => setFormData({ ...formData, appointmentDate: e.target.value })}
-                      min={format(new Date(), 'yyyy-MM-dd')}
-                      className="w-full h-9 px-3 rounded-lg border border-hairline text-xs text-ink bg-white outline-none"
-                    />
-                  </div>
-
-                  {/* Time Slots */}
-                  <div>
-                    <label className="text-xs font-semibold text-ink block mb-1.5">Available Slots</label>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                      {TIME_SLOTS.map((slot) => {
-                        const isSelected = formData.appointmentTime === slot;
-                        return (
-                          <button
-                            key={slot}
-                            type="button"
-                            onClick={() => setFormData({ ...formData, appointmentTime: slot })}
-                            className={`py-2 px-2.5 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
-                              isSelected
-                                ? 'border-[#12B76A] bg-[#12B76A] text-white font-bold'
-                                : 'border-hairline bg-white hover:bg-surface-soft text-ink'
-                            }`}
-                          >
-                            {slot}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* ── STEP 4: REVIEW & CONFIRMATION ────────────────────── */}
               {currentStep === 4 && (
                 <div className="space-y-4">
                   <div className="mb-4">
-                    <h3 className="text-base font-semibold text-ink">Review & Confirm</h3>
+                    <h3 className="text-base font-semibold text-ink">Review & Confirm Ticket</h3>
                     <p className="text-xs text-muted">
-                      Please double-check your booking summary before locking your slot.
+                      Please double-check your details before generating your queue token.
                     </p>
                   </div>
 
@@ -631,7 +516,7 @@ export function CustomerBookingWizard({
                         </div>
                       </div>
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {mode === 'queue' ? 'Live Queue' : 'Appointment'}
+                        Live Virtual Queue
                       </span>
                     </div>
 
@@ -652,36 +537,20 @@ export function CustomerBookingWizard({
                         <span className="text-muted block">Contact Phone:</span>
                         <strong className="text-ink">{formData.phone}</strong>
                       </div>
-
-                      {mode === 'queue' ? (
-                        <>
-                          <div>
-                            <span className="text-muted block">Priority Type:</span>
-                            <span className="capitalize font-semibold text-ink">{formData.priority}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted block">Estimated Wait:</span>
-                            <span className="font-semibold text-[#12B76A]">~{currentService.avgWait}</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <span className="text-muted block">Date:</span>
-                            <strong className="text-ink">{formData.appointmentDate}</strong>
-                          </div>
-                          <div>
-                            <span className="text-muted block">Time Slot:</span>
-                            <strong className="text-ink">{formData.appointmentTime}</strong>
-                          </div>
-                        </>
-                      )}
+                      <div>
+                        <span className="text-muted block">Priority Type:</span>
+                        <span className="capitalize font-semibold text-ink">{formData.priority}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted block">Estimated Wait:</span>
+                        <span className="font-semibold text-[#12B76A]">~{currentService.avgWait}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* ── FOOTER NAVIGATION CONTROLS ───────────────────────── */}
+              {/* Navigation Controls */}
               <div className="mt-8 pt-4 border-t border-hairline flex items-center justify-between">
                 <button
                   type="button"
@@ -705,7 +574,7 @@ export function CustomerBookingWizard({
                 ) : (
                   <button
                     type="button"
-                    onClick={handleComplete}
+                    onClick={handleCompleteQueue}
                     disabled={isSubmitting}
                     className="px-6 py-2 rounded-lg bg-[#12B76A] hover:bg-[#0fa05c] text-white font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
                   >
@@ -714,7 +583,7 @@ export function CustomerBookingWizard({
                     ) : (
                       <>
                         <Check size={14} strokeWidth={3} />
-                        <span>{mode === 'queue' ? 'Join Virtual Queue Now' : 'Confirm Appointment'}</span>
+                        <span>Join Virtual Queue Now</span>
                       </>
                     )}
                   </button>

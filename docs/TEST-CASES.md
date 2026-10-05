@@ -36,3 +36,41 @@
 | **TC-MSG-026** | FR-MSG-001 | Customer submits query with non-existent appointment ID | Invalid appointment UUID | `appointment_id: "99999999-..."` | 1. POST query with bad appointment ID | 400 Bad Request; foreign key constraint violation handled cleanly | As expected | **PASS** |
 | **TC-MSG-027** | FR-MSG-001 | Priority escalation to URGENT | Category: "emergency" / critical | Priority: `urgent` | 1. Submit query with urgent flag | Flagged as urgent with red priority pill; top of staff inbox | As expected | **PASS** |
 | **TC-MSG-028** | FR-MSG-009 | Realtime channel cleanup on unmount | Customer navigates from Chat to Dashboard | Component lifecycle | 1. Open Chat<br>2. Navigate to Dashboard | `supabase.removeChannel` called; zero memory leaks or dangling sockets | As expected | **PASS** |
+
+---
+
+## MODULE: GUIDED APPOINTMENT BOOKING UX/UI (MOD-APPT-UX)
+
+| Test ID | Req ID | Test Scenario | Preconditions | Test Data / Payload | Execution Steps | Expected Result | Actual Result | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: |
+| **TC-APPT-UX-01** | FR-APPT-UX-001 | 3-Step Guided Flow Progression | Customer logged in | Facility ID, General Consultation | 1. Open Booking Flow<br>2. Select Service<br>3. Verify Step 2 unlocks | Interface progresses to Date & Time with breadcrumb indicator | As expected | **PASS** |
+| **TC-APPT-UX-02** | FR-APPT-UX-002 | Continue button disabled until service selected | Step 1 active | No service selected | 1. View Step 1<br>2. Attempt to click Continue | Continue button is disabled with opacity 60% and not clickable | As expected | **PASS** |
+| **TC-APPT-UX-03** | FR-APPT-UX-003 | Dynamic availability slots query | Facility and Service selected | Target date: YYYY-MM-DD | 1. Select date on Step 2<br>2. Inspect API call | `GET /api/v1/appointments/slots` called; slots grouped into Morning, Afternoon, Evening | As expected | **PASS** |
+| **TC-APPT-UX-04** | FR-APPT-UX-004 | Double submission prevention | Step 3 active | Valid booking payload | 1. Click "Confirm Appointment" rapidly | Button immediately disables, displays "Confirming..." spinner, sends single API request | As expected | **PASS** |
+| **TC-APPT-UX-05** | FR-APPT-UX-005 | Slot conflict recovery | Another user books slot concurrently | 10:00 AM slot | 1. API returns 409 Conflict<br>2. Observe error modal | Shows "This time slot is no longer available" and "Choose another time" CTA returning to Step 2 | As expected | **PASS** |
+| **TC-APPT-UX-06** | FR-APPT-UX-006 | Zero form fatigue with auto-profile sync | Authenticated profile has Name & Phone | Profile data in context | 1. Review Step 3 details | Name, email, and phone pre-populated without manual re-entry | As expected | **PASS** |
+| **TC-APPT-UX-07** | FR-APPT-UX-007 | Calendar .ics file export | Booking confirmed | Booking reference: `EZ-...` | 1. On success screen, click "Add to Calendar" | Browser downloads `.ics` file with appointment summary, date, time, and location | As expected | **PASS** |
+| **TC-APPT-UX-08** | FR-APPT-UX-001 | Back navigation preserves selections | User on Step 3 | Service: Cardiology, Date: Tomorrow, Time: 02:00 PM | 1. Click "Back"<br>2. Check Step 2<br>3. Click "Back" to Step 1 | Previously chosen service, date, and time remain selected without data loss | As expected | **PASS** |
+| **TC-APPT-UX-09** | FR-APPT-UX-001 | Contextual "Book Again" prefill | Past appointment in `/app/history` | Past appointment: Cardiology, Metro Hospital | 1. Click "Book Again" on past appointment | Wizard opens directly with facility and service preselected | As expected | **PASS** |
+| **TC-APPT-UX-10** | FR-APPT-UX-001 | Existing appointment reschedule | Upcoming appointment in `/app/appointments` | Appointment ID | 1. Click "Reschedule"<br>2. Pick new slot<br>3. Confirm | `PATCH /appointments/:id/reschedule` called, updates list in real time | As expected | **PASS** |
+| **TC-APPT-UX-11** | FR-APPT-UX-001 | Existing appointment cancellation | Upcoming appointment in `/app/appointments` | Appointment ID, Reason | 1. Click "Cancel"<br>2. Provide reason<br>3. Confirm | `PATCH /appointments/:id/cancel` called, status updates to cancelled and slot released | As expected | **PASS** |
+| **TC-APPT-UX-12** | FR-APPT-UX-001 | Mobile viewport 390px responsive design | Mobile screen simulation (390px) | Full booking flow | 1. Complete booking on mobile viewport | No horizontal overflow; full-width buttons; expandable summary card | As expected | **PASS** |
+
+---
+
+## MODULE: STAFF QUEUE TV DISPLAY / WAITING AREA BOARD (MOD-QUEUE-TV)
+
+| Test ID | Req ID | Test Scenario | Preconditions | Test Data / Payload | Execution Steps | Expected Result | Actual Result | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :---: |
+| **TC-TV-01** | FR-TV-001 | Dedicated Staff TV Display Navigation | Staff or Admin user authenticated | Route: `/staff/queue-display` | 1. Log in as staff (`staff@demo.com`)<br>2. Check sidebar navigation | "TV Display" entry with Tv icon is present under Staff section | As expected | **PASS** |
+| **TC-TV-02** | FR-TV-002 | Fullscreen Display Mode Toggle | TV Display page loaded | Fullscreen API supported | 1. Click "Enter Fullscreen"<br>2. Press "ESC" | Browser activates fullscreen, hides staff chrome; ESC key cleanly exits | As expected | **PASS** |
+| **TC-TV-03** | FR-TV-003 | Strict Light-Theme High-Contrast Verification | Board rendered | CSS color inspection | 1. Inspect DOM background and typography | Background `#FFFFFF`, surfaces `#F8F9FA`, borders `#E5E7EB`, text `#111111`; zero dark mode | As expected | **PASS** |
+| **TC-TV-04** | FR-TV-004 | Hero Ticket Scalability (1080p to 4K) | Active serving ticket: `A104` | Viewport sizes: 1080p, 1440p, 4K | 1. Resize browser viewport<br>2. Observe ticket font size | Ticket typography scales fluidly using `clamp(4.25rem, 11vw, 10.5rem)` | As expected | **PASS** |
+| **TC-TV-05** | FR-TV-005 | Realtime Supabase Queue Synchronization | Staff desk advances ticket | Event: `UPDATE queue_tickets` | 1. Staff calls next ticket<br>2. Observe TV board | Board updates serving ticket & desk in real time without page reload | As expected | **PASS** |
+| **TC-TV-06** | FR-TV-006 | Zero Customer PII Exposure Audit | Waiting tickets with customer records | Ticket records in DB | 1. Inspect TV Display HTML source & network | Zero customer names, emails, phones, or notes rendered; only ticket & counter numbers | As expected | **PASS** |
+| **TC-TV-07** | FR-TV-007 | Web Audio API Clinic Chime & Highlight Pulse | Audio output enabled | C5 -> E5 dual-tone synthesis | 1. Click "Test Chime"<br>2. Trigger ticket call | Chime sounds without autoplay rejection; 400ms visual pulse highlights new ticket | As expected | **PASS** |
+| **TC-TV-08** | FR-TV-008 | Realtime Disconnect & Reconnect Handling | WebSocket connection dropped | Offline network simulation | 1. Drop socket connection<br>2. Restore socket | Displays "Reconnecting..." badge; automatically restores "Live Sync" and resyncs queue | As expected | **PASS** |
+| **TC-TV-09** | FR-TV-009 | Strict Read-Only UI Enforcement | Staff viewing TV Display | Display screen | 1. Inspect page controls | No "Call Next", "Serve", "Skip", or "Complete" mutating controls present | As expected | **PASS** |
+| **TC-TV-10** | FR-TV-004 | Dynamic Multi-Counter Grid Adaptation | 3 active counters configured | Desk 1, Desk 2, Desk 3 | 1. Open display board | Renders dynamic cards for all 3 desks with current tickets and staff names | As expected | **PASS** |
+
+

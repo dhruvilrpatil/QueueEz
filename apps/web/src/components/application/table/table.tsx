@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import { clsx } from 'clsx';
-import { ArrowDown, ArrowUp, HelpCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, HelpCircle } from 'lucide-react';
 import type { SortDescriptor } from '@/types/react-aria';
 
 // ── Table Context ─────────────────────────────────────────────
@@ -231,7 +231,7 @@ export function TableHead({
                 <ArrowDown size={12} className="text-primary font-bold" />
               )
             ) : (
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity">↕</span>
+              <ArrowUpDown size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
             )}
           </span>
         )}

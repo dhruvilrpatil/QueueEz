@@ -358,7 +358,7 @@ export const Table01DividerLine = () => {
                     color="tertiary"
                     tooltip="Edit Details"
                     icon={Edit01}
-                    onClick={() => toast(`Editing ${item.name} settings`, { icon: '✏️' })}
+                    onClick={() => toast(`Editing ${item.name} settings`)}
                   />
                 </div>
               </Table.Cell>

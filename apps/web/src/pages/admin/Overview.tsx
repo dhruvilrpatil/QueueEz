@@ -284,9 +284,7 @@ function AdminOverview() {
                     variant={isEmergencyPaused ? 'primary' : 'secondary'}
                     onClick={() => {
                       setIsEmergencyPaused(!isEmergencyPaused);
-                      toast(isEmergencyPaused ? 'Queue session resumed' : 'Emergency pause triggered across all desks', {
-                        icon: isEmergencyPaused ? '▶️' : '⚠️',
-                      });
+                      toast(isEmergencyPaused ? 'Queue session resumed' : 'Emergency pause triggered across all desks');
                     }}
                   >
                     {isEmergencyPaused ? <PlayCircle size={15} /> : <PauseCircle size={15} />}
@@ -823,7 +821,7 @@ function AdminOverview() {
                   </button>
 
                   <button
-                    onClick={() => toast('Active filters: Last 12 months • All healthcare services • SLA benchmarks', { icon: '🔍' })}
+                    onClick={() => toast('Active filters: Last 12 months • All healthcare services • SLA benchmarks')}
                     className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-ink bg-canvas border border-hairline rounded-lg shadow-xs hover:bg-surface-soft hover:border-border transition-colors cursor-pointer"
                   >
                     <Filter size={16} className="text-muted" />
@@ -833,7 +831,7 @@ function AdminOverview() {
                     </span>
                   </button>
                   <button
-                    onClick={() => toast('Dashboard customize mode enabled', { icon: '⚙️' })}
+                    onClick={() => toast('Dashboard customize mode enabled')}
                     className="inline-flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-ink bg-canvas border border-hairline rounded-lg shadow-xs hover:bg-surface-soft hover:border-border transition-colors cursor-pointer"
                   >
                     <Sliders size={16} className="text-muted" />
@@ -861,7 +859,7 @@ function AdminOverview() {
                         <p className="text-caption text-muted mt-0.5">5 departments • Real-time patient volume share</p>
                       </div>
                       <button
-                        onClick={() => toast('Service breakdown report options', { icon: 'ℹ️' })}
+                        onClick={() => toast('Service breakdown report options')}
                         className="text-muted hover:text-ink p-1 rounded-md hover:bg-surface-soft transition-colors cursor-pointer"
                         aria-label="Options"
                       >
@@ -1023,7 +1021,7 @@ function AdminOverview() {
                         </p>
                       </div>
                       <button
-                        onClick={() => toast('Trend metric benchmarks: Regional Healthcare SLA', { icon: 'ℹ️' })}
+                        onClick={() => toast('Trend metric benchmarks: Regional Healthcare SLA')}
                         className="text-muted hover:text-ink p-1 rounded-md hover:bg-surface-soft transition-colors cursor-pointer"
                         aria-label="Options"
                       >

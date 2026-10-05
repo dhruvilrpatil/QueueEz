@@ -176,7 +176,7 @@ export function PublicFooter() {
           ))}
         </div>
         <div className="border-t border-surface-dark-elevated pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-caption text-on-dark-soft">
-          <p>© {new Date().getFullYear()} EzQueue. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} EzQueue. All rights reserved.</p>
           <p>Built for Semester V FSD & SDM Project</p>
         </div>
       </div>

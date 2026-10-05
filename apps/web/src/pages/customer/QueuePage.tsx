@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, MapPin, AlertCircle, X, RefreshCw, MessageSquare } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, X, RefreshCw, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { AppLayout, PageHeader } from '@/components/layout/AppSidebar';
 import { Button } from '@/components/ui/Button';
 import { TicketStatusBadge } from '@/components/ui/Badge';
@@ -158,7 +158,10 @@ function QueueTicketPage() {
         {/* Completed banner */}
         {isCompleted && (
           <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center">
-            <p className="text-body-sm font-semibold text-success mb-1">✓ Service completed!</p>
+            <p className="text-body-sm font-semibold text-success mb-1 flex items-center justify-center gap-1.5">
+              <CheckCircle2 size={16} />
+              <span>Service completed!</span>
+            </p>
             <p className="text-caption text-success/80">Thank you for using EzQueue.</p>
           </div>
         )}

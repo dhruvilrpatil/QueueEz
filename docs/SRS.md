@@ -100,3 +100,48 @@ The Customer Query & Messaging Module facilitates bidirectional, contextual comm
 * Supabase Realtime channel `realtime:facility-{facilityId}` for staff and `realtime:conversation-{conversationId}` for participants.
 * Realtime payloads broadcast record updates upon `INSERT` and `UPDATE` on `conversations` and `messages`.
 * Client listeners must immediately unmount and detach WebSocket listeners on view change to prevent memory leaks.
+
+---
+
+### 5. Guided Appointment Booking UX/UI Subsystem (MOD-APPT-UX)
+
+#### 5.1 Purpose & Scope
+The Guided Appointment Booking Subsystem redesigns and streamlines the patient-facing appointment reservation experience. It replaces multi-field complex forms with a progressive, 3-step "one decision at a time" interaction flow that eliminates user cognitive overload and minimizes booking drop-offs while reusing the existing Express.js and Supabase appointment backend.
+
+#### 5.2 Functional Requirements
+* **FR-APPT-UX-001 (Guided Progressive Disclosure):** The system shall provide a simple, guided appointment booking interface that minimizes user confusion and prevents invalid or duplicate bookings.
+* **FR-APPT-UX-002 (3-Step Progress Tracking):** The interface shall structure booking into three distinct sequential steps:
+  1. *Step 1: Choose Service* (displaying service name, description, duration, and availability)
+  2. *Step 2: Choose Date & Time* (scannable grouped slots: Morning, Afternoon, Evening)
+  3. *Step 3: Review & Confirm* (complete appointment review and final authorization)
+* **FR-APPT-UX-003 (Dynamic Slot Availability):** Real-time available slots shall be queried dynamically from `GET /api/v1/appointments/slots` based on facility operating hours and existing bookings.
+* **FR-APPT-UX-004 (Double Submission Guard):** The confirmation action button shall disable immediately upon submission, display a `Confirming...` loading state, and preserve button width to prevent accidental duplicate bookings.
+* **FR-APPT-UX-005 (Slot Conflict Recovery):** If a selected slot is booked concurrently before confirmation, the system shall display a friendly conflict notice and return the user to the time selection step while preserving selected service and date.
+* **FR-APPT-UX-006 (Zero Form Fatigue):** Authenticated patient credentials (name, email, phone) shall be automatically bound to the booking without requiring redundant re-entry.
+* **FR-APPT-UX-007 (Calendar Synchronization):** Upon booking confirmation, the system shall provide an instant `.ics` calendar file download for device calendar integration alongside direct links to `/app/appointments` and `/app/dashboard`.
+
+---
+
+### 6. Staff Queue TV Display Subsystem (MOD-QUEUE-TV)
+
+#### 6.1 Purpose & Scope
+The Staff Queue TV Display Subsystem provides a dedicated, read-only public waiting area visual board for reception screens, clinic TVs, and monitors. It presents live queue progress with ultra-high contrast and readability from several meters away, completely eliminating patient ambiguity regarding which ticket is being called and which counter desk to visit. It strictly operates on the existing queue backend and Supabase Realtime channel with zero secondary queue state duplication or write mutations.
+
+#### 6.2 Functional Requirements
+* **FR-TV-001 (Dedicated Staff Navigation & Route):** The system shall provide a dedicated navigation entry `TV Display` under the Staff navigation menu (`AppSidebar.tsx`) routing to `/staff/queue-display`, protected by existing Staff/Admin RBAC.
+* **FR-TV-002 (Dual-Mode Operation):** The TV Display shall provide two operating modes:
+  1. *Normal Preview Mode*: Embedded within the staff layout with interactive chime testing, sound toggle, service category filtering, and operational metrics.
+  2. *Fullscreen Display Mode*: Activated via `[Enter Fullscreen]` using the browser Fullscreen API (`document.documentElement.requestFullscreen()`), automatically suppressing unnecessary chrome and floating controls on mouse idle.
+* **FR-TV-003 (Strict Light-Theme High-Contrast Aesthetic):** The TV screen shall adhere strictly to a crisp light theme (`#FFFFFF` background, `#F8F9FA` surfaces, `#E5E7EB` hairline borders, `#111111` typography) following `DESIGN.md`. Dark themes, glassmorphism, neon colors, and AI glowing effects are explicitly prohibited.
+* **FR-TV-004 (Visual Information Hierarchy & Scaling):** The public board shall prioritize information in the following strict hierarchy:
+  1. *Hero NOW SERVING*: Ticket number scaled dynamically via `clamp(4.25rem, 11vw, 10.5rem)` with target desk announcement (`PLEASE PROCEED TO COUNTER X`).
+  2. *Active Counters Dynamic Grid*: Scannable cards adapting to open desks showing counter name, staff assignment, and currently served ticket.
+  3. *Next in Line Queue Strip*: Sequential upcoming waiting tickets ordered by backend queue rules without revealing private customer data.
+  4. *Header & Footer Guidance*: Facility name, active service, local live clock, live sync status, and waiting count ticker.
+* **FR-TV-005 (Real-Time Reactive Streaming):** The display shall subscribe to Supabase Realtime `postgres_changes` on `queue_tickets` and `counters` scoped to the authenticated facility. State changes (ticket called, served, completed, skipped) shall reflect instantly without full-page reloads.
+* **FR-TV-006 (Zero Customer PII Exposure):** The public board shall never render patient names, telephone numbers, email addresses, or private appointment notes. Only ticket identifiers, service names, and counter numbers shall be displayed.
+* **FR-TV-007 (Announcement Chime & Attention Highlight):** When a new ticket is called, the display shall trigger a short visual pulse (300-500ms) on the ticket card and play a harmonic dual-tone clinic chime (C5 -> E5) via Web Audio API when sound is enabled.
+* **FR-TV-008 (Connection Lifecycle & Stale Data Protection):** The interface shall display a discreet `Live Sync` vs `Reconnecting...` indicator. If connectivity is lost, last known state is retained with a subtle notice, and automatic queue resynchronization occurs immediately upon reconnection.
+* **FR-TV-009 (Strict Read-Only Enforcement):** The TV Display interface shall not expose queue manipulation controls (Call Next, Serve, Complete, Skip). All queue modifications remain strictly confined to the existing staff queue dashboard.
+
+

@@ -62,7 +62,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       apiClient.setTokenProvider(async () => sessionData.access_token);
       const response = await apiClient.get<{ success: true; data: Profile }>('/auth/me');
       if (response.success && response.data) {
-        setProfile(response.data);
+        let p = response.data;
+        const savedAvatar = localStorage.getItem(`queueez_avatar_${p.id}`);
+        const metaAvatar = sessionData.user?.user_metadata?.avatar_url || sessionData.user?.user_metadata?.picture;
+        if (!p.avatar_url && (savedAvatar || metaAvatar)) {
+          p = { ...p, avatar_url: savedAvatar || metaAvatar };
+        }
+        setProfile(p);
       }
     } catch {
       console.warn('Could not fetch profile from API, using local session');
@@ -88,9 +94,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       DEMO_PROFILES[profile.email] = updated;
     }
     localStorage.setItem(`queueez_profile_${profile.id}`, JSON.stringify(updated));
+    if (updates.avatar_url !== undefined) {
+      if (updates.avatar_url) {
+        localStorage.setItem(`queueez_avatar_${profile.id}`, updates.avatar_url);
+      } else {
+        localStorage.removeItem(`queueez_avatar_${profile.id}`);
+      }
+    }
 
     try {
-      await apiClient.patch('/auth/me', updates);
+      await apiClient.patch('/auth/profile', updates);
     } catch {
       // Local fallback
     }
@@ -109,6 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // Ignore
         }
+      }
+      const savedAvatar = localStorage.getItem(`queueez_avatar_${demoProfile.id}`);
+      if (savedAvatar) {
+        demoProfile = { ...demoProfile, avatar_url: savedAvatar };
       }
       const mockUser = {
         id: demoProfile.id,
@@ -182,7 +199,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Check if it's a demo account
     if (DEMO_PROFILES[normalizedEmail]) {
-      const demoProfile = DEMO_PROFILES[normalizedEmail];
+      let demoProfile = DEMO_PROFILES[normalizedEmail];
+      const cached = localStorage.getItem(`queueez_profile_${demoProfile.id}`);
+      if (cached) {
+        try {
+          demoProfile = { ...demoProfile, ...JSON.parse(cached) };
+        } catch {
+          // Ignore
+        }
+      }
+      const savedAvatar = localStorage.getItem(`queueez_avatar_${demoProfile.id}`);
+      if (savedAvatar) {
+        demoProfile = { ...demoProfile, avatar_url: savedAvatar };
+      }
       const mockUser = {
         id: demoProfile.id,
         email: demoProfile.email,

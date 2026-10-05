@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Check } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import toast from 'react-hot-toast';
 
@@ -309,7 +309,7 @@ export function RegisterPage() {
             QueueEz
           </Link>
           <div className="w-14 h-14 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-success text-2xl font-bold">✓</span>
+            <Check className="w-7 h-7 text-success stroke-[2.5]" />
           </div>
           <h2 className="text-2xl font-semibold text-ink mb-2">Check your email</h2>
           <p className="text-sm text-muted mb-6">

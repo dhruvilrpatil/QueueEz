@@ -6,7 +6,7 @@ import {
   Mail, Phone, Share2, UploadCloud, User, Building2,
   Shield, Layers, Clock, Copy, ExternalLink, Sparkles,
   MapPin, Calendar, Heart, Stethoscope, Award, CheckCircle2,
-  Settings, Key, AlertCircle, FileText, ChevronRight
+  Settings, Key, AlertCircle, FileText, ChevronRight, X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import defaultAvatarImg from '@/assets/avatar_olivia.jpg';
@@ -62,7 +62,7 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
 
   // Avatar state - default or uploaded
   const [avatarPreview, setAvatarPreview] = useState<string>(() => {
-    return profile?.avatar_url || localStorage.getItem(`queueez_avatar_${profile?.id}`) || defaultAvatarImg;
+    return profile?.avatar_url || (profile?.id ? localStorage.getItem(`queueez_avatar_${profile.id}`) : '') || '';
   });
 
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -78,8 +78,30 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
     }
     if (profile?.email) setEmail(profile.email);
     if (profile?.phone) setPhone(profile.phone);
-    if (profile?.avatar_url) setAvatarPreview(profile.avatar_url);
+    if (profile?.avatar_url) {
+      setAvatarPreview(profile.avatar_url);
+    } else if (profile?.id) {
+      const saved = localStorage.getItem(`queueez_avatar_${profile.id}`);
+      if (saved) setAvatarPreview(saved);
+    }
   }, [profile]);
+
+  const handleRemovePhoto = async () => {
+    setAvatarPreview('');
+    if (profile?.id) {
+      localStorage.removeItem(`queueez_avatar_${profile.id}`);
+      try {
+        await supabase
+          .from('profiles')
+          .update({ avatar_url: null, updated_at: new Date().toISOString() })
+          .eq('id', profile.id);
+      } catch {
+        // Ignore
+      }
+    }
+    await updateProfile({ avatar_url: undefined });
+    toast.success('Profile picture removed');
+  };
 
   // Handle image upload with Supabase Storage integration + local fallback
   const handleImageUpload = async (file: File) => {
@@ -186,10 +208,10 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
     const names = getNames();
     setFirstName(names.first);
     setLastName(names.last);
-    setEmail(profile?.email || 'olivia@untitledui.com');
-    setPhone(profile?.phone || '+1 (555) 000-0000');
-    setAvatarPreview(profile?.avatar_url || defaultAvatarImg);
-    toast('Changes discarded', { icon: '↩️' });
+    setEmail(profile?.email || 'admin@demo.com');
+    setPhone(profile?.phone || '+91-9876543210');
+    setAvatarPreview(profile?.avatar_url || (profile?.id ? localStorage.getItem(`queueez_avatar_${profile.id}`) : '') || '');
+    toast('Changes discarded');
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -279,12 +301,18 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
           {/* Avatar + Clean Name & Email */}
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="relative shrink-0">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-hairline shadow-xs overflow-hidden bg-white">
-                <img
-                  src={avatarPreview}
-                  alt={firstName}
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border border-hairline shadow-xs overflow-hidden bg-surface-soft flex items-center justify-center">
+                {avatarPreview ? (
+                  <img
+                    src={avatarPreview}
+                    alt={firstName || 'User'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-primary text-white flex items-center justify-center text-2xl font-bold">
+                    {(firstName || profile?.full_name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -652,12 +680,29 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
                 </label>
                 <div className="flex flex-col sm:flex-row items-center gap-5">
                   {/* Avatar circular preview */}
-                  <div className="relative shrink-0">
-                    <img
-                      src={avatarPreview}
-                      alt="Thumbnail preview"
-                      className="w-16 h-16 rounded-full object-cover border border-hairline shadow-2xs"
-                    />
+                  <div className="relative shrink-0 flex flex-col items-center gap-1.5">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border border-hairline shadow-2xs bg-surface-soft flex items-center justify-center">
+                      {avatarPreview ? (
+                        <img
+                          src={avatarPreview}
+                          alt="Thumbnail preview"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-primary text-white flex items-center justify-center text-lg font-bold">
+                          {(firstName || profile?.full_name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    {avatarPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        className="text-[11px] text-error hover:underline cursor-pointer font-medium"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
 
                   {/* Drag-and-drop / Click-to-upload box */}
@@ -728,7 +773,7 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
                     onClick={() => setIsPreviewModalOpen(false)}
                     className="w-8 h-8 rounded-full bg-surface-soft hover:bg-surface-card text-muted hover:text-ink flex items-center justify-center transition-colors cursor-pointer text-sm font-bold"
                   >
-                    ✕
+                    <X size={16} />
                   </button>
                 </div>
                 <div className="w-24 h-24 rounded-full border border-hairline shadow-md mx-auto overflow-hidden bg-white mb-3">

@@ -15,7 +15,7 @@ import {
   Phone, RotateCcw, SkipForward, Play, CheckCircle, UserX,
   Clock, Users, CheckSquare, BarChart2, Plus, Volume2, VolumeX,
   Layers, Search, User, Sparkles, Check, Calendar, Bell, Settings,
-  AlertTriangle, ArrowRight, ShieldCheck, MonitorCheck
+  AlertTriangle, ArrowRight, ShieldCheck, MonitorCheck, Tv
 } from 'lucide-react';
 import { Select } from '@/components/base/select/select';
 import {
@@ -351,6 +351,16 @@ function StaffQueueDashboard() {
             onClick={() => setIsWalkinModalOpen(true)}
           >
             Walk-in
+          </Button>
+
+          {/* TV Display Button */}
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={<Tv size={14} />}
+            onClick={() => navigate('/staff/queue-display')}
+          >
+            TV Display
           </Button>
         </div>
       </div>

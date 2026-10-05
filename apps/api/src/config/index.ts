@@ -17,6 +17,6 @@ export const config = {
 const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'];
 for (const key of requiredEnv) {
   if (!process.env[key]) {
-    console.warn(`⚠️  Warning: ${key} environment variable is not set`);
+    console.warn(`[Warning] ${key} environment variable is not set`);
   }
 }

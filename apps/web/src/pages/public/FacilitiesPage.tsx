@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Search, MapPin, Clock, ChevronRight, Building2, Calendar, ArrowLeft, Check, Shield } from 'lucide-react';
 import { PublicHeader, PublicFooter } from '@/components/layout/PublicNav';
 import { Button } from '@/components/ui/Button';
@@ -147,15 +147,38 @@ export function FacilitiesPage() {
 
 export function FacilityDetailPage() {
   const navigate = useNavigate();
+  const { facilityId } = useParams<{ facilityId: string }>();
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardMode, setWizardMode] = useState<WizardMode>('queue');
+  const [wizardMode, setWizardMode] = useState<WizardMode>('appointment');
+  const [selectedServiceId, setSelectedServiceId] = useState<string | undefined>(undefined);
 
-  const handleOpenQueue = () => {
+  const targetFacilityId = facilityId || '00000000-0000-0000-0000-000000000010';
+
+  const { data: facilityRes, isLoading } = useQuery({
+    queryKey: ['facility', targetFacilityId],
+    queryFn: () => apiClient.get<{ success: true; data: Facility }>(`/facilities/${targetFacilityId}`),
+  });
+
+  const facility = facilityRes?.data;
+  const facilityName = facility?.name || 'Metro General Hospital';
+  const facilityAddress = facility?.address || '100 Medical Center Dr';
+  const facilityCity = facility?.city || 'Metro City';
+  const avgWait = facility?.avg_service_time_minutes || 12;
+
+  const services = facility?.services || [
+    { id: '00000000-0000-0000-0000-000000000020', name: 'General Consultation', description: 'Routine checkup with general physician', duration_minutes: 15, allows_appointment: true, allows_walk_in: true },
+    { id: '00000000-0000-0000-0000-000000000021', name: 'Specialist Consultation', description: 'Specialist doctor consultation', duration_minutes: 30, allows_appointment: true, allows_walk_in: false },
+    { id: '00000000-0000-0000-0000-000000000025', name: 'Diagnostic Lab Test', description: 'Pathology & sample collection', duration_minutes: 10, allows_appointment: true, allows_walk_in: true },
+  ];
+
+  const handleOpenQueue = (serviceId?: string) => {
+    setSelectedServiceId(serviceId);
     setWizardMode('queue');
     setWizardOpen(true);
   };
 
-  const handleOpenAppointment = () => {
+  const handleOpenAppointment = (serviceId?: string) => {
+    setSelectedServiceId(serviceId);
     setWizardMode('appointment');
     setWizardOpen(true);
   };
@@ -182,25 +205,25 @@ export function FacilityDetailPage() {
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Open Now
                 </span>
-                <span className="text-xs text-muted">Clinic & Multi-specialty</span>
+                <span className="text-xs text-muted capitalize">{facility?.category || 'Healthcare & Services'}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-ink font-display tracking-tight mb-2">
-                Metro General Hospital
+                {facilityName}
               </h1>
               <p className="text-sm text-muted flex items-center gap-1.5 mb-1">
-                <MapPin size={14} /> 100 Medical Center Dr, Metro City, 10001
+                <MapPin size={14} /> {facilityAddress}, {facilityCity}
               </p>
               <p className="text-xs text-muted flex items-center gap-1.5">
-                <Clock size={14} /> Open 24/7 • Average wait ~12 mins
+                <Clock size={14} /> Open Mon-Sat • Average service ~{avgWait} mins
               </p>
             </div>
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-              <Button onClick={handleOpenQueue}>
+              <Button onClick={() => handleOpenQueue()}>
                 <Clock size={16} /> Join Virtual Queue
               </Button>
-              <Button variant="secondary" onClick={handleOpenAppointment}>
+              <Button variant="secondary" onClick={() => handleOpenAppointment()}>
                 <Calendar size={16} /> Book Appointment
               </Button>
             </div>
@@ -209,39 +232,34 @@ export function FacilityDetailPage() {
 
         {/* Department / Services Grid */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-ink mb-4 font-display">Available Services & Desks</h2>
+          <h2 className="text-lg font-bold text-ink mb-4 font-display">Available Services & Departments</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { name: 'General Consultation', avg: '12m', doctor: 'Dr. Jane Smith', desk: 'Counter 1' },
-              { name: 'Cardiology Specialist', avg: '25m', doctor: 'Dr. Marcus Vance', desk: 'Counter 2' },
-              { name: 'Diagnostic Lab Test', avg: '8m', doctor: 'David Kim', desk: 'Counter 3' },
-              { name: 'Pharmacy & Dispensary', avg: '5m', doctor: 'Front Counter', desk: 'Counter 4' },
-            ].map((srv) => (
+            {services.map((srv) => (
               <div
-                key={srv.name}
+                key={srv.id || srv.name}
                 className="bg-white border border-hairline rounded-xl p-5 hover:border-ink/20 transition-all flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <h3 className="text-sm font-bold text-ink">{srv.name}</h3>
                     <span className="text-xs text-muted font-medium bg-surface-soft px-2 py-0.5 rounded border border-hairline">
-                      ~{srv.avg} wait
+                      {srv.duration_minutes || 30}m duration
                     </span>
                   </div>
-                  <p className="text-xs text-muted">Physician: {srv.doctor} • {srv.desk}</p>
+                  <p className="text-xs text-muted">{srv.description || 'Specialized consultation and services'}</p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-hairline flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={handleOpenQueue}
+                    onClick={() => handleOpenQueue(srv.id)}
                     className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                   >
                     Join line →
                   </button>
                   <button
                     type="button"
-                    onClick={handleOpenAppointment}
-                    className="text-xs font-semibold text-muted hover:text-ink cursor-pointer"
+                    onClick={() => handleOpenAppointment(srv.id)}
+                    className="text-xs font-semibold text-ink hover:text-primary transition-colors cursor-pointer bg-surface-soft px-2.5 py-1 rounded-md border border-hairline"
                   >
                     Schedule slot
                   </button>
@@ -253,11 +271,13 @@ export function FacilityDetailPage() {
       </div>
       <PublicFooter />
 
-      {/* Interactive Wizard */}
+      {/* Interactive Wizard with Preselected Context */}
       <CustomerBookingWizard
         isOpen={wizardOpen}
         onClose={() => setWizardOpen(false)}
         initialMode={wizardMode}
+        initialFacilityId={targetFacilityId}
+        initialServiceId={selectedServiceId}
       />
     </div>
   );

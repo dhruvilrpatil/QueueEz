@@ -38,7 +38,7 @@ export default {
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
-        display: ['Inter', 'ui-sans-serif', 'sans-serif'],
+        display: ['"Cal Sans"', 'Inter', 'ui-sans-serif', 'sans-serif'],
       },
       borderRadius: {
         xs: '4px',

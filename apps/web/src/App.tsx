@@ -25,6 +25,7 @@ import { LoginPage, RegisterPage, ForgotPasswordPage } from './pages/auth/AuthPa
 // ── Customer pages (lazy) ────────────────────────────────────
 const CustomerDashboard = lazy(() => import('./pages/customer/Dashboard'));
 const QueueTicketPage = lazy(() => import('./pages/customer/QueuePage'));
+const BookingPage = lazy(() => import('./pages/customer/BookingPage'));
 
 // ── Profile page (shared across all three entities) ──────────
 const ProfilePage = lazy(() => import('./pages/shared/ProfilePage'));
@@ -39,6 +40,7 @@ const AdminOverview = lazy(() => import('./pages/admin/Overview'));
 const CustomerMessagesPage = lazy(() => import('./pages/customer/MessagesPage'));
 const StaffChatPage = lazy(() => import('./pages/staff/ChatPage'));
 const AdminChatPage = lazy(() => import('./pages/admin/AdminChatPage'));
+const StaffQueueDisplayPage = lazy(() => import('./pages/staff/QueueDisplayPage'));
 
 import { PageSkeleton } from './components/ui/Skeleton';
 
@@ -117,6 +119,14 @@ const router = createBrowserRouter([
                 element: (
                   <Suspense fallback={<PageLoader />}>
                     <CustomerDashboard />
+                  </Suspense>
+                ),
+              },
+              {
+                path: 'book',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <BookingPage />
                   </Suspense>
                 ),
               },
@@ -214,6 +224,14 @@ const router = createBrowserRouter([
                 ),
               },
               {
+                path: 'queue-display',
+                element: (
+                  <Suspense fallback={<PageLoader />}>
+                    <StaffQueueDisplayPage />
+                  </Suspense>
+                ),
+              },
+              {
                 path: 'history',
                 element: (
                   <Suspense fallback={<PageLoader />}>
@@ -288,6 +306,7 @@ const router = createBrowserRouter([
                 ),
               },
               { path: 'analytics', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
+              { path: 'queue-display', element: <Suspense fallback={<PageLoader />}><StaffQueueDisplayPage /></Suspense> },
               { path: 'settings', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               { path: 'audit-logs', element: <Suspense fallback={<PageLoader />}><AdminOverview /></Suspense> },
               {

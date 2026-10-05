@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, Clock, Calendar } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui/Button';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 export function PublicHeader() {
   const { isAuthenticated, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const getDashboardPath = () => {
@@ -16,6 +17,26 @@ export function PublicHeader() {
       case 'facility_admin': return '/admin/overview';
       case 'system_admin': return '/system/organizations';
       default: return '/app/dashboard';
+    }
+  };
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    if (to.startsWith('/#') || to.startsWith('#')) {
+      const targetId = to.replace('/#', '').replace('#', '');
+      if (location.pathname === '/') {
+        e.preventDefault();
+        const element = document.getElementById(targetId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.history.pushState(null, '', `#${targetId}`);
+        }
+      } else {
+        e.preventDefault();
+        navigate(`/#${targetId}`);
+      }
+    } else if (to === '/facilities' && location.pathname === '/facilities') {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -41,6 +62,7 @@ export function PublicHeader() {
               <Link
                 key={to}
                 to={to}
+                onClick={(e) => handleNavClick(e, to)}
                 className="px-3 py-2 text-body-sm font-medium text-muted hover:text-ink transition-colors rounded-md hover:bg-surface-soft"
               >
                 {label}
@@ -90,7 +112,10 @@ export function PublicHeader() {
               <Link
                 key={to}
                 to={to}
-                onClick={() => setMobileOpen(false)}
+                onClick={(e) => {
+                  setMobileOpen(false);
+                  handleNavClick(e, to);
+                }}
                 className="block px-3 py-2.5 text-body-sm font-medium text-ink hover:bg-surface-soft rounded-md"
               >
                 {label}
@@ -120,6 +145,29 @@ export function PublicHeader() {
 }
 
 export function PublicFooter() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleFooterNavClick = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+    if (to.startsWith('/#') || to.startsWith('#')) {
+      const targetId = to.replace('/#', '').replace('#', '');
+      if (location.pathname === '/') {
+        e.preventDefault();
+        const element = document.getElementById(targetId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          window.history.pushState(null, '', `#${targetId}`);
+        }
+      } else {
+        e.preventDefault();
+        navigate(`/#${targetId}`);
+      }
+    } else if (to === '/facilities' && location.pathname === '/facilities') {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const footerLinks = {
     Product: [
       { label: 'Features', to: '/#features' },
@@ -165,6 +213,7 @@ export function PublicFooter() {
                   <li key={to}>
                     <Link
                       to={to}
+                      onClick={(e) => handleFooterNavClick(e, to)}
                       className="text-body-sm text-on-dark-soft hover:text-on-dark transition-colors"
                     >
                       {label}
@@ -177,7 +226,7 @@ export function PublicFooter() {
         </div>
         <div className="border-t border-surface-dark-elevated pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-caption text-on-dark-soft">
           <p>&copy; {new Date().getFullYear()} EzQueue. All rights reserved.</p>
-          <p>Built for Semester V FSD & SDM Project</p>
+          <p>Next-Generation Virtual Queue & Appointment Platform</p>
         </div>
       </div>
     </footer>

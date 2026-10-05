@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   Clock, Calendar, Bell, BarChart2, ChevronRight, CheckCircle,
   Building2, Users, Zap, ArrowRight, Star
@@ -87,6 +87,20 @@ function FeatureCard({
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const targetId = location.hash.replace('#', '');
+      const timer = setTimeout(() => {
+        const element = document.getElementById(targetId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [location.hash]);
 
   return (
     <div className="min-h-screen">
@@ -144,7 +158,7 @@ export function LandingPage() {
       </section>
 
       {/* Problem band */}
-      <section className="bg-surface-card py-24" id="features">
+      <section className="bg-surface-card py-24 scroll-mt-16" id="features">
         <div className="container-content text-center mb-16">
           <h2 className="text-5xl font-semibold text-ink mb-4 tracking-tight">
             Long queues shouldn't be<br />part of the process.
@@ -190,7 +204,7 @@ export function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section className="container-content py-24" id="how-it-works">
+      <section className="container-content py-24 scroll-mt-16" id="how-it-works">
         <div className="text-center mb-16">
           <h2 className="text-5xl font-semibold text-ink mb-4 tracking-tight">
             How EzQueue works

@@ -414,14 +414,33 @@ export function ContactPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim() || !email.trim() || !message.trim()) {
+      toast.error('Please fill in all required fields.');
+      return;
+    }
     setIsSubmitting(true);
+
+    const categoryLabels: Record<string, string> = {
+      hospital_onboarding: 'Hospital or Clinic Deployment',
+      enterprise_demo: 'Enterprise Queue License',
+      technical_support: 'Technical & Realtime Assistance',
+      billing: 'Billing & SLA Inquiries',
+    };
+    const categoryText = categoryLabels[category] || category;
+    const subject = encodeURIComponent(`[QueueEz Inquiry] ${categoryText} - ${name}`);
+    const body = encodeURIComponent(
+      `Name: ${name}\nEmail: ${email}\nInquiry Type: ${categoryText}\n\nMessage:\n${message}\n\n---\nDispatched via QueueEz Contact Portal`
+    );
+    const mailtoUrl = `mailto:ubrivant@gmail.com?subject=${subject}&body=${body}`;
+
     setTimeout(() => {
       setIsSubmitting(false);
-      toast.success('Your message has been dispatched to our support team!');
+      window.location.href = mailtoUrl;
+      toast.success('Opening your email client to dispatch to ubrivant@gmail.com...');
       setName('');
       setEmail('');
       setMessage('');
-    }, 600);
+    }, 400);
   };
 
   return (
@@ -453,8 +472,8 @@ export function ContactPage() {
                   <div>
                     <h3 className="text-body-sm font-semibold text-ink">Email Support</h3>
                     <p className="text-caption text-muted">Direct dispatch to our engineering desk</p>
-                    <a href="mailto:support@queueez.io" className="text-body-sm font-medium text-primary hover:underline mt-1 block">
-                      support@queueez.io
+                    <a href="mailto:ubrivant@gmail.com" className="text-body-sm font-medium text-primary hover:underline mt-1 block">
+                      ubrivant@gmail.com
                     </a>
                   </div>
                 </div>
@@ -476,8 +495,8 @@ export function ContactPage() {
                   </div>
                   <div>
                     <h3 className="text-body-sm font-semibold text-ink">Headquarters</h3>
-                    <p className="text-caption text-muted">500 Healthcare Boulevard, Suite 400</p>
-                    <p className="text-body-sm font-medium text-ink mt-1">San Francisco, CA 94107</p>
+                    <p className="text-caption text-muted">SBMP College, Erla, Vile Parle(West)</p>
+                    <p className="text-body-sm font-medium text-ink mt-1">Mumbai - 400031, Maharashtra, India</p>
                   </div>
                 </div>
               </div>

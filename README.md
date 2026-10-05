@@ -1,6 +1,6 @@
 # EzQueue – Smart Appointment & Virtual Queue Management System
 
-> **Semester V End-Semester Full-Stack Project**  
+> **Next-Generation Virtual Queue & Appointment Platform**  
 > Built with React 18, Vite, TypeScript, Express.js, Supabase PostgreSQL with Row-Level Security, and Cal.com Design System principles.
 
 ---

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Edit01, Trash01 } from "@untitledui/icons";
 import type { SortDescriptor } from "react-aria-components";
 import { PaginationPageMinimalCenter } from "@/components/application/pagination/pagination";
@@ -10,6 +10,7 @@ import { ButtonUtility } from "@/components/base/buttons/button-utility";
 import { DropdownIconSimple } from "@/components/base/dropdown/dropdown-icon-simple";
 import { useAuth } from "@/providers/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { apiClient } from "@/lib/api-client";
 import { UserPlus, Plus, X, Check, Mail, User, Shield, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -25,6 +26,8 @@ export interface TeamMemberItem {
   teams: { name: string; color: BadgeColor<BadgeTypes> }[];
 }
 
+const STORAGE_KEY = "queueez_staff_members";
+
 export const Table01DividerLine = () => {
   const { profile, user } = useAuth();
 
@@ -33,8 +36,8 @@ export const Table01DividerLine = () => {
     direction: "ascending",
   });
 
-  // Default single member (the active admin) as requested: "for now only keep one member in admin portal"
-  const getSingleMember = (): TeamMemberItem => {
+  // Default single member (the active admin)
+  const getSingleMember = useCallback((): TeamMemberItem => {
     const googleAvatar =
       profile?.avatar_url ||
       user?.user_metadata?.avatar_url ||
@@ -71,17 +74,29 @@ export const Table01DividerLine = () => {
         { name: "Active Desk", color: "success" },
       ],
     };
-  };
+  }, [profile, user]);
 
+  const defaultSingleMember = useMemo<TeamMemberItem>(() => getSingleMember(), [getSingleMember]);
+
+  // Synchronously initialize state from localStorage so the added staff is immediately rendered on refresh
   const [members, setMembers] = useState<TeamMemberItem[]>(() => {
-    const saved = localStorage.getItem("queueez_staff_members");
-    if (saved) {
-      try {
+    const single = getSingleMember();
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch {}
-    }
-    return [getSingleMember()];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const exists = parsed.some(
+            (m) => m.email?.toLowerCase() === single.email.toLowerCase() || m.id === single.id
+          );
+          if (!exists) {
+            return [single, ...parsed];
+          }
+          return parsed;
+        }
+      }
+    } catch {}
+    return [single];
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -95,73 +110,110 @@ export const Table01DividerLine = () => {
   const [newDesk, setNewDesk] = useState("General OPD Desk");
   const [newPhone, setNewPhone] = useState("");
 
-  const defaultSingleMember = useMemo<TeamMemberItem>(() => getSingleMember(), [profile, user]);
-
-  // Fetch team members from Supabase profiles table
-  const fetchMembers = async () => {
+  // Fetch team members from backend API and Database profiles
+  const fetchMembers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .in("role", ["staff", "facility_admin", "system_admin"])
-        .order("created_at", { ascending: false });
+      // 1. Get current saved members from localStorage as our base of truth
+      const currentSaved: TeamMemberItem[] = (() => {
+        try {
+          const s = localStorage.getItem(STORAGE_KEY);
+          if (s) {
+            const p = JSON.parse(s);
+            if (Array.isArray(p)) return p;
+          }
+        } catch {}
+        return [];
+      })();
 
-      if (error || !data || data.length === 0) {
-        // If no records exist in Supabase yet, check local storage or keep 1 member
-        const saved = localStorage.getItem("queueez_staff_members");
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setMembers(parsed);
-              return;
-            }
-          } catch {}
+      // 2. Fetch from backend Express API
+      let serverStaff: any[] = [];
+      try {
+        const res = await apiClient.get<{ success: true; data: any[] }>("/facilities/staff");
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          serverStaff = res.data;
         }
-        setMembers([defaultSingleMember]);
-      } else {
-        // If records exist in Supabase, map them
-        const mapped: TeamMemberItem[] = data.map((p) => {
-          const email = p.email || "staff@facility.org";
-          const roleLabel =
-            p.role === "facility_admin"
-              ? "Facility Administrator"
-              : p.role === "system_admin"
-              ? "System Administrator"
-              : "Staff Physician / Operator";
+      } catch {}
 
-          return {
-            id: p.id,
-            name: p.full_name || "Healthcare Staff",
-            username: `@${email.split("@")[0]}`,
-            avatarUrl:
-              p.avatar_url ||
-              `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.full_name || "Staff")}`,
-            status: "active",
-            role: roleLabel,
-            rawRole: p.role as 'staff' | 'facility_admin' | 'system_admin',
-            email: email,
-            teams: [
-              { name: p.role === "staff" ? "Outpatient" : "Operations", color: "brand" },
-              { name: "Active Desk", color: "success" },
-            ],
-          };
-        });
+      // 3. Also query database directly if available
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("role", ["staff", "facility_admin", "system_admin"])
+          .order("created_at", { ascending: false });
 
-        setMembers(mapped.length > 0 ? mapped : [defaultSingleMember]);
-        localStorage.setItem("queueez_staff_members", JSON.stringify(mapped));
+        if (data && Array.isArray(data) && data.length > 0) {
+          for (const sp of data) {
+            if (!serverStaff.some((s) => s.id === sp.id || s.email?.toLowerCase() === sp.email?.toLowerCase())) {
+              serverStaff.push(sp);
+            }
+          }
+        }
+      } catch {}
+
+      // 4. Map server items into TeamMemberItem format
+      const serverMapped: TeamMemberItem[] = serverStaff.map((p) => {
+        const email = p.email || "staff@facility.org";
+        const roleLabel =
+          p.role === "facility_admin"
+            ? "Facility Administrator"
+            : p.role === "system_admin"
+            ? "System Administrator"
+            : "Staff Physician / Operator";
+
+        return {
+          id: p.id,
+          name: p.full_name || p.name || "Healthcare Staff",
+          username: `@${email.split("@")[0]}`,
+          avatarUrl:
+            p.avatar_url ||
+            `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.full_name || p.name || "Staff")}`,
+          status: "active",
+          role: roleLabel,
+          rawRole: (p.role as 'staff' | 'facility_admin' | 'system_admin') || 'staff',
+          email: email,
+          teams: [
+            { name: p.desk || (p.role === "staff" ? "Outpatient" : "Operations"), color: "brand" },
+            { name: "Active Desk", color: "success" },
+          ],
+        };
+      });
+
+      // 5. Intelligent merge: preserve locally added staff + server staff + active admin
+      const mergedMap = new Map<string, TeamMemberItem>();
+
+      // Active admin member always preserved
+      const single = defaultSingleMember;
+      mergedMap.set(single.email.toLowerCase(), single);
+
+      // Add all server items
+      for (const item of serverMapped) {
+        mergedMap.set(item.email.toLowerCase(), item);
       }
+
+      // Add all currentSaved items (preserving locally created staff that might not be on server yet)
+      for (const item of currentSaved) {
+        if (!mergedMap.has(item.email.toLowerCase())) {
+          mergedMap.set(item.email.toLowerCase(), item);
+        }
+      }
+
+      const mergedList = Array.from(mergedMap.values());
+      setMembers(mergedList);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedList));
+      } catch {}
     } catch {
       // Fallback
     }
-  };
+  }, [defaultSingleMember]);
 
   useEffect(() => {
     fetchMembers();
 
-    // Subscribe to real-time changes on Supabase 'profiles' table
+    // Subscribe to real-time changes on database 'profiles' table
     const channel = supabase
-      .channel("supabase_staff_sync")
+      .channel("database_staff_sync")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles" },
@@ -174,9 +226,9 @@ export const Table01DividerLine = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [defaultSingleMember]);
+  }, [fetchMembers]);
 
-  // Handle adding a new member to Supabase
+  // Handle adding a new member to Database and local directory
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim() || !newEmail.trim()) {
@@ -186,54 +238,70 @@ export const Table01DividerLine = () => {
 
     setIsSubmitting(true);
     const newMemberId = crypto.randomUUID();
+    const cleanEmail = newEmail.trim().toLowerCase();
     const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(newName.trim())}`;
 
-    try {
-      // 1. Insert into Supabase profiles table
+    const createdItem: TeamMemberItem = {
+      id: newMemberId,
+      name: newName.trim(),
+      username: `@${cleanEmail.split("@")[0]}`,
+      avatarUrl,
+      status: "active",
+      role: newRole === "facility_admin" ? "Facility Administrator" : "Staff Physician / Operator",
+      rawRole: newRole,
+      email: cleanEmail,
+      teams: [
+        { name: newDesk, color: "brand" },
+        { name: "Active Desk", color: "success" },
+      ],
+    };
+
+    // 1. Immediately update React state and localStorage so it is 100% persistent on refresh
+    setMembers((prev) => {
+      const filtered = prev.filter((m) => m.email.toLowerCase() !== cleanEmail && m.id !== newMemberId);
+      const updated = [createdItem, ...filtered];
       try {
-        await supabase.from("profiles").insert({
-          id: newMemberId,
-          email: newEmail.trim(),
-          full_name: newName.trim(),
-          phone: newPhone.trim() || null,
-          role: newRole,
-          avatar_url: avatarUrl,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      } catch {
-        // Offline / RLS fallback
-      }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
 
-      // 2. Reactively update local table state so UI reflects the new member immediately
-      const createdItem: TeamMemberItem = {
-        id: newMemberId,
+    // 2. Persist to backend Express API
+    try {
+      await apiClient.post<{ success: true; data: any }>("/facilities/staff", {
         name: newName.trim(),
-        username: `@${newEmail.trim().split("@")[0]}`,
-        avatarUrl,
-        status: "active",
-        role: newRole === "facility_admin" ? "Facility Administrator" : "Staff Physician / Operator",
-        rawRole: newRole,
-        email: newEmail.trim(),
-        teams: [
-          { name: newDesk, color: "brand" },
-          { name: "Active Desk", color: "success" },
-        ],
-      };
-
-      setMembers((prev) => [createdItem, ...prev]);
-      toast.success(`Added ${newName} to team directory`);
-      setIsAddModalOpen(false);
-
-      // Reset form
-      setNewName("");
-      setNewEmail("");
-      setNewPhone("");
+        email: cleanEmail,
+        role: newRole,
+        phone: newPhone.trim() || null,
+        desk: newDesk,
+        avatar_url: avatarUrl,
+      });
     } catch {
-      toast.error("Failed to add team member");
-    } finally {
-      setIsSubmitting(false);
+      // Offline fallback
     }
+
+    // 3. Fallback client-side database insert attempt
+    try {
+      await supabase.from("profiles").insert({
+        id: newMemberId,
+        email: cleanEmail,
+        full_name: newName.trim(),
+        phone: newPhone.trim() || null,
+        role: newRole,
+        avatar_url: avatarUrl,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    } catch {}
+
+    toast.success(`Added ${newName} to team directory`);
+    setIsAddModalOpen(false);
+
+    // Reset form
+    setNewName("");
+    setNewEmail("");
+    setNewPhone("");
+    setIsSubmitting(false);
   };
 
   // Handle removing a member
@@ -245,17 +313,24 @@ export const Table01DividerLine = () => {
 
     if (!confirm(`Are you sure you want to remove ${memberName}?`)) return;
 
-    try {
+    // Immediately update state and localStorage
+    setMembers((prev) => {
+      const updated = prev.filter((m) => m.id !== memberId);
       try {
-        await supabase.from("profiles").delete().eq("id", memberId);
-      } catch {
-        // fallback
-      }
-      setMembers((prev) => prev.filter((m) => m.id !== memberId));
-      toast.success(`Removed ${memberName} from team`);
-    } catch {
-      toast.error("Could not remove member");
-    }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    try {
+      await apiClient.delete(`/facilities/staff/${memberId}`);
+    } catch {}
+
+    try {
+      await supabase.from("profiles").delete().eq("id", memberId);
+    } catch {}
+
+    toast.success(`Removed ${memberName} from team`);
   };
 
   const sortedItems = useMemo(() => {
@@ -369,7 +444,7 @@ export const Table01DividerLine = () => {
 
       <PaginationPageMinimalCenter page={1} total={1} className="px-4 py-3 md:px-6 md:pt-3 md:pb-4" />
 
-      {/* ── Add Team Member Modal (Connected to Supabase) ── */}
+      {/* ── Add Team Member Modal (Connected to Database) ── */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-xs">
           <div className="bg-canvas border border-hairline rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -380,7 +455,7 @@ export const Table01DividerLine = () => {
                 </div>
                 <div>
                   <h3 className="text-body-sm font-bold text-ink">Add Team Member</h3>
-                  <p className="text-caption text-muted">Syncs directly to Supabase profiles database</p>
+                  <p className="text-caption text-muted">Syncs directly to database profiles</p>
                 </div>
               </div>
               <button
@@ -469,7 +544,7 @@ export const Table01DividerLine = () => {
                   disabled={isSubmitting}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-ink hover:bg-ink-muted rounded-lg shadow-xs transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting ? "Adding..." : "Add to Supabase"}
+                  {isSubmitting ? "Adding..." : "Add to Database"}
                 </button>
               </div>
             </form>

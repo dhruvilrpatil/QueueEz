@@ -178,7 +178,7 @@ export class MessagingRepository {
     limit?: number;
   }): Promise<{ items: Conversation[]; total: number; unreadTotal: number }> {
     try {
-      // Attempt Supabase query first
+      // Attempt database query first
       let query = supabaseAdmin
         .from('conversations')
         .select(`

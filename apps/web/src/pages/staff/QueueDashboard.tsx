@@ -567,7 +567,7 @@ function StaffQueueDashboard() {
                   <div>
                     <label className="text-caption font-semibold text-muted block mb-1">Operator Profile</label>
                     <p className="text-ink font-medium">{profile?.full_name || 'Dr. Jane Smith (Staff)'}</p>
-                    <p className="text-caption text-muted">{profile?.email || 'staff@demo.com'} • Role: Staff Counter</p>
+                    <p className="text-caption text-muted">{profile?.email || 'staff@queueez.com'} • Role: Staff Counter</p>
                   </div>
                   <div className="pt-2 border-t border-hairline">
                     <label className="text-caption font-semibold text-muted block mb-1">Assigned Facility</label>

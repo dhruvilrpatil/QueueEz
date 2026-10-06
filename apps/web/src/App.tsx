@@ -73,6 +73,7 @@ const router = createBrowserRouter([
     element: <GuestOnly />,
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/admin/login', element: <LoginPage isAdminPortal /> },
       { path: '/register', element: <RegisterPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
     ],

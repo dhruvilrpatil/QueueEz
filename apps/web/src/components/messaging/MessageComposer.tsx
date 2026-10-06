@@ -142,7 +142,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               type="button"
               className="p-1 text-[#9CA3AF] hover:text-[#111111] rounded hover:bg-[#E5E7EB] transition-colors"
               title="Attach file (Optional)"
-              onClick={() => alert('Attachments can be dropped or uploaded using Supabase Storage.')}
+              onClick={() => alert('Attachments can be dropped or uploaded using database storage.')}
             >
               <Paperclip className="w-3.5 h-3.5" />
             </button>

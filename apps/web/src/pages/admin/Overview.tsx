@@ -133,7 +133,7 @@ function AdminOverview() {
 
   const analytics = analyticsRes?.data;
 
-  // Supabase real-time channel subscription for immediate updates
+  // Database real-time channel subscription for immediate updates
   useEffect(() => {
     try {
       const channel = supabase

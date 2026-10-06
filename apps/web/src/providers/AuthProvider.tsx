@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/api-client';
 import type { Profile, UserRole } from '@/types';
+import toast from 'react-hot-toast';
 
 export const DEMO_PROFILES: Record<string, Profile> = {
   'customer@demo.com': {
@@ -42,7 +43,9 @@ interface AuthContextValue {
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<Profile>;
+  signInWithGoogle: (redirectTo?: string) => Promise<void>;
+  signInWithAdminGoogle: (redirectTo?: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -57,22 +60,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (sessionData: Session) => {
+  const fetchProfile = useCallback(async (sessionData: Session): Promise<Profile> => {
+    const bootstrapEmail = (
+      import.meta.env.VITE_BOOTSTRAP_ADMIN_EMAIL ||
+      'jbondntd007@gmail.com'
+    ).trim().toLowerCase();
+    const isBootstrap = sessionData.user?.email?.trim().toLowerCase() === bootstrapEmail;
+
     try {
       apiClient.setTokenProvider(async () => sessionData.access_token);
       const response = await apiClient.get<{ success: true; data: Profile }>('/auth/me');
       if (response.success && response.data) {
         let p = response.data;
+        if (isBootstrap) {
+          p = {
+            ...p,
+            role: 'facility_admin',
+            facility_id: p.facility_id || '00000000-0000-0000-0000-000000000010',
+          };
+        }
         const savedAvatar = localStorage.getItem(`queueez_avatar_${p.id}`);
         const metaAvatar = sessionData.user?.user_metadata?.avatar_url || sessionData.user?.user_metadata?.picture;
         if (!p.avatar_url && (savedAvatar || metaAvatar)) {
           p = { ...p, avatar_url: savedAvatar || metaAvatar };
         }
         setProfile(p);
+        return p;
       }
     } catch {
-      console.warn('Could not fetch profile from API, using local session');
+      console.warn('Could not fetch profile from API, using fallback session');
     }
+
+    // Infallible fallback profile ensuring user is never left without profile state
+    let fallbackRole: UserRole = (sessionData.user?.app_metadata?.role as UserRole) || 'customer';
+    let fallbackFacility = sessionData.user?.app_metadata?.facility_id;
+    if (isBootstrap) {
+      fallbackRole = 'facility_admin';
+      fallbackFacility = fallbackFacility || '00000000-0000-0000-0000-000000000010';
+    }
+
+    const fallbackProfile: Profile = {
+      id: sessionData.user.id,
+      email: sessionData.user.email || '',
+      full_name:
+        sessionData.user.user_metadata?.full_name ||
+        sessionData.user.email?.split('@')[0] ||
+        'User',
+      role: fallbackRole,
+      facility_id: fallbackFacility,
+      avatar_url:
+        sessionData.user.user_metadata?.avatar_url ||
+        sessionData.user.user_metadata?.picture ||
+        null,
+      created_at: sessionData.user.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setProfile(fallbackProfile);
+    return fallbackProfile;
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -154,7 +199,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Otherwise try Supabase session
     try {
-      supabase.auth.getSession().then(({ data: { session: s } }) => {
+      supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+        const adminIntent = sessionStorage.getItem('queueez_admin_oauth_intent') === 'true';
+        const bootstrapEmail = (
+          import.meta.env.VITE_BOOTSTRAP_ADMIN_EMAIL ||
+          'jbondntd007@gmail.com'
+        ).trim().toLowerCase();
+
+        if (s && adminIntent) {
+          sessionStorage.removeItem('queueez_admin_oauth_intent');
+          const userEmail = s.user?.email?.trim().toLowerCase();
+          if (userEmail !== bootstrapEmail) {
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setIsLoading(false);
+            toast.error(
+              `Access Denied: Only ${bootstrapEmail} is authorized to sign in to the Admin Portal. The account (${userEmail || 'selected'}) is not authorized.`,
+              { duration: 7000, id: 'admin-oauth-unauthorized' }
+            );
+            window.location.replace('/login?error=unauthorized_admin');
+            return;
+          }
+        }
+
         setSession(s);
         setUser(s?.user ?? null);
         if (s) {
@@ -170,6 +239,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         async (event, s) => {
           // If demo user is active, don't overwrite with null supabase session
           if (localStorage.getItem('ezqueue_demo_user')) return;
+
+          const adminIntent = sessionStorage.getItem('queueez_admin_oauth_intent') === 'true';
+          const bootstrapEmail = (
+            import.meta.env.VITE_BOOTSTRAP_ADMIN_EMAIL ||
+            'jbondntd007@gmail.com'
+          ).trim().toLowerCase();
+
+          if (s && adminIntent && event === 'SIGNED_IN') {
+            sessionStorage.removeItem('queueez_admin_oauth_intent');
+            const userEmail = s.user?.email?.trim().toLowerCase();
+            if (userEmail !== bootstrapEmail) {
+              await supabase.auth.signOut();
+              setSession(null);
+              setUser(null);
+              setProfile(null);
+              apiClient.setTokenProvider(async () => null);
+              setIsLoading(false);
+              toast.error(
+                `Access Denied: Only ${bootstrapEmail} is authorized to sign in to the Admin Portal. The account (${userEmail || 'selected'}) is not authorized.`,
+                { duration: 7000, id: 'admin-oauth-unauthorized' }
+              );
+              window.location.replace('/login?error=unauthorized_admin');
+              return;
+            }
+          }
 
           setSession(s);
           setUser(s?.user ?? null);
@@ -194,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchProfile]);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<Profile> => {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Check if it's a demo account
@@ -234,16 +328,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(demoProfile);
       setSession(mockSession);
       apiClient.setTokenProvider(async () => `demo-token-${demoProfile.role}`);
-      return;
+      return demoProfile;
     }
 
     // Otherwise use live Supabase
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (error) throw new Error(error.message);
+      if (data.session) {
+        localStorage.removeItem('ezqueue_demo_user');
+        setSession(data.session);
+        setUser(data.session.user);
+        const resolvedProfile = await fetchProfile(data.session);
+        return resolvedProfile;
+      }
+      throw new Error('Sign in succeeded but no active session was returned');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to connect to authentication server';
       throw new Error(message);
+    }
+  };
+
+  const signInWithGoogle = async (redirectTo?: string) => {
+    const targetUrl = redirectTo && redirectTo.startsWith('/')
+      ? `${window.location.origin}${redirectTo}`
+      : `${window.location.origin}/`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: targetUrl,
+      },
+    });
+    if (error) throw new Error(error.message);
+  };
+
+  const signInWithAdminGoogle = async (redirectTo: string = '/admin/overview') => {
+    sessionStorage.setItem('queueez_admin_oauth_intent', 'true');
+    const targetUrl = `${window.location.origin}${redirectTo.startsWith('/') ? redirectTo : `/${redirectTo}`}`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: targetUrl,
+      },
+    });
+    if (error) {
+      sessionStorage.removeItem('queueez_admin_oauth_intent');
+      throw new Error(error.message);
     }
   };
 
@@ -265,6 +395,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     localStorage.removeItem('ezqueue_demo_user');
+    sessionStorage.removeItem('queueez_admin_oauth_intent');
     try {
       await supabase.auth.signOut();
     } catch {
@@ -285,6 +416,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         signIn,
+        signInWithGoogle,
+        signInWithAdminGoogle,
         signUp,
         signOut,
         refreshProfile,

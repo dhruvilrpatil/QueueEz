@@ -44,7 +44,7 @@ $$\text{Unread} = \{ m \in \text{Messages} \mid m.\text{created\_at} > p.\text{l
 Staff navigation shall display a dedicated badge showing the active unread count calculated from database state.
 
 #### FR-MSG-009: Realtime Message Synchronization
-The system shall propagate new messages, message read events, status changes, and assignments to connected clients via Supabase Realtime channels within $\le 500\text{ ms}$ without full page reloads.
+The system shall propagate new messages, message read events, status changes, and assignments to connected clients via database realtime channels within $\le 500\text{ ms}$ without full page reloads.
 
 #### FR-MSG-010: Conversation Status Management
 Authorized staff and administrators shall be able to change conversation lifecycle statuses according to the defined state machine:

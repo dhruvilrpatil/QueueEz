@@ -342,7 +342,7 @@ function CustomerDashboard() {
                   </div>
                   <div className="pt-2 border-t border-hairline">
                     <label className="text-caption font-semibold text-muted block mb-1">Email Address</label>
-                    <p className="text-ink font-medium">{profile?.email || 'customer@demo.com'}</p>
+                    <p className="text-ink font-medium">{profile?.email || 'customer@queueez.com'}</p>
                   </div>
                   <div className="pt-2 border-t border-hairline">
                     <label className="text-caption font-semibold text-muted block mb-1">Phone Number</label>

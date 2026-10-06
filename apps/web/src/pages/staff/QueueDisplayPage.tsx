@@ -173,7 +173,7 @@ export default function QueueDisplayPage() {
               Display Preview
             </span>
             <span className="text-caption text-muted">
-              Auto-updates via Supabase Realtime
+              Auto-updates via Database Realtime
             </span>
           </div>
 

@@ -62,6 +62,25 @@ export function RequireRole({ roles }: { roles: UserRole[] }) {
   if (isLoading) return <LoadingScreen />;
   if (!profile) return <Navigate to="/login" replace />;
 
+  // Dedicated security check: Only bootstrap email or demo admin allowed into Admin Portal
+  if (roles.includes('facility_admin') || location.pathname.startsWith('/admin')) {
+    const bootstrapEmail = (
+      import.meta.env.VITE_BOOTSTRAP_ADMIN_EMAIL ||
+      'jbondntd007@gmail.com'
+    ).trim().toLowerCase();
+    const isAuthorized =
+      profile.email.trim().toLowerCase() === bootstrapEmail ||
+      profile.email.trim().toLowerCase() === 'admin@demo.com';
+
+    if (!isAuthorized) {
+      toast.error(
+        `Access Denied: Only authorized organization administrator (${bootstrapEmail}) can access the Admin Portal.`,
+        { id: 'admin-unauthorized-guard', duration: 6000 }
+      );
+      return <Navigate to="/app/dashboard" replace />;
+    }
+  }
+
   if (!roles.includes(profile.role)) {
     const targetPath = ROLE_HOME_PATHS[profile.role] || '/login';
 

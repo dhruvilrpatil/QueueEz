@@ -436,3 +436,10 @@ VALUES
   ('00000000-0000-0000-0000-000000000010', 'Counter 3', 3, 'offline'),
   ('00000000-0000-0000-0000-000000000011', 'Counter A', 1, 'available'),
   ('00000000-0000-0000-0000-000000000011', 'Counter B', 2, 'available');
+
+-- Enable Supabase Realtime for queue & counter status
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE queue_tickets, counters;
+EXCEPTION WHEN OTHERS THEN null;
+END $$;
+

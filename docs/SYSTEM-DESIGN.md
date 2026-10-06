@@ -140,6 +140,6 @@
 
 * **Zero Queue Mutation Attack Surface**: The TV Display is strictly read-only (`GET` query and Realtime listening). It exposes no mutating endpoints or user action handlers capable of advancing, serving, or canceling queue tickets.
 * **PII Redaction at the Boundary**: The display model (`DisplayTicket`) maps only `ticket_number`, `service_name`, and `counter_name`. All customer names, email addresses, medical notes, and contact numbers are discarded before reaching the rendering layer.
-* **Resilient Connection Lifecycle**: Supabase Realtime channel detachment is guaranteed on component unmount via `supabase.removeChannel(channel)`. Network interruptions trigger the `Reconnecting...` badge and automatically resynchronize the board upon socket re-establishment.
+* **Resilient Connection Lifecycle**: Database Realtime channel detachment is guaranteed on component unmount via `supabase.removeChannel(channel)`. Network interruptions trigger the `Reconnecting...` badge and automatically resynchronize the board upon socket re-establishment.
 * **Audio Autoplay Compliance**: The Web Audio API context is created and resumed strictly upon explicit user interaction (e.g. clicking "Enter Fullscreen", "Test Chime", or toggling "Sound ON"), guaranteeing that no unhandled audio promise rejection occurs.
 

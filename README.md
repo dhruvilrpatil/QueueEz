@@ -5,31 +5,31 @@
 
 ---
 
-## 📌 Executive Summary & Problem Solved
+## 1. Executive Summary & Problem Solved
 
 EzQueue solves the friction and lost productivity caused by long physical queues and inefficient walk-in management at high-traffic facilities such as **clinics, banks, customer care centers, educational offices, and diagnostic labs**.
 
 ### Key Value Propositions
 - **For Customers / Citizens:**
-  - 🔍 **Discover Facilities:** Browse service locations, operating hours, active queues, and wait times.
-  - 🎟️ **Instant Virtual Queueing:** Join queues remotely or on-site to receive a live digital ticket number.
-  - ⏱️ **Real-Time Position Tracking:** Monitor your exact place in queue and estimated wait time live via WebSockets.
-  - 📅 **Advance Appointment Booking:** Reserve time slots in advance with automated conflict prevention and buffer management.
-  - 🔔 **Instant Status Alerts:** Real-time visual and audio cues when called to a specific service counter.
+  - **Discover Facilities:** Browse service locations, operating hours, active queues, and wait times.
+  - **Instant Virtual Queueing:** Join queues remotely or on-site to receive a live digital ticket number.
+  - **Real-Time Position Tracking:** Monitor your exact place in queue and estimated wait time live via WebSockets.
+  - **Advance Appointment Booking:** Reserve time slots in advance with automated conflict prevention and buffer management.
+  - **Instant Status Alerts:** Real-time visual and audio cues when called to a specific service counter.
 
 - **For Staff & Counter Operators:**
-  - 🎯 **Dedicated Counter Dashboard:** Call next customer, start service, complete service, skip, mark no-show, or transfer.
-  - 📊 **Live Operational Metrics:** View served count, average service time, waiting tickets, and counter occupancy in real time.
-  - 🔄 **Multi-Counter Support:** Seamless ticket delegation and load balancing between staff counters.
+  - **Dedicated Counter Dashboard:** Call next customer, start service, complete service, skip, mark no-show, or transfer.
+  - **Live Operational Metrics:** View served count, average service time, waiting tickets, and counter occupancy in real time.
+  - **Multi-Counter Support:** Seamless ticket delegation and load balancing between staff counters.
 
 - **For Facility & System Administrators:**
-  - 📈 **Performance Analytics:** Historical throughput, service speed trends, and peak-hour heatmaps.
-  - ⚙️ **Service & Counter Configuration:** Define slot capacities, average service durations, and operating schedules.
-  - 🛡️ **Role-Based Access Control (RBAC):** Strict isolation between customers, staff, facility admins, and system administrators.
+  - **Performance Analytics:** Historical throughput, service speed trends, and peak-hour heatmaps.
+  - **Service & Counter Configuration:** Define slot capacities, average service durations, and operating schedules.
+  - **Role-Based Access Control (RBAC):** Strict isolation between customers, staff, facility admins, and system administrators.
 
 ---
 
-## 🛠️ Technology Stack & Architecture
+## 2. Technology Stack & Architecture
 
 ```
                                   EzQueue Monorepo
@@ -55,7 +55,7 @@ apps/web (Frontend)                                             apps/api (Backen
 
 ---
 
-## 🎨 UI/UX Design System Compliance (`DESIGN.md`)
+## 3. UI/UX Design System Compliance (`DESIGN.md`)
 
 EzQueue strictly adheres to the design specification in `DESIGN.md`:
 - **Typography:** Uses Cal Sans display hierarchy for titles paired with Inter for clean, readable interface typography and JetBrains Mono for ticket tokens and timestamps.
@@ -65,23 +65,43 @@ EzQueue strictly adheres to the design specification in `DESIGN.md`:
 
 ---
 
-## 🚀 Getting Started & Local Development
+## 4. Documentation Index
 
-### 1. Prerequisites
-- **Node.js:** v18.0.0 or higher
-- **npm:** v9.0.0 or higher
-- **Supabase Account / Local PostgreSQL**
+The complete documentation suite is available in the [`docs/`](docs/) directory:
 
-### 2. Monorepo Installation
+- [Deployment & Operations Guide](docs/DEPLOYMENT.md)
+- [Supabase Setup & Realtime Configuration](docs/SUPABASE_SETUP.md)
+- [Security Audit & Vulnerability Assessment](docs/SECURITY_AUDIT.md)
+- [Software Requirements Specification (SRS)](docs/SRS.md)
+- [System Design Document](docs/SYSTEM-DESIGN.md)
+- [Requirement Traceability Matrix](docs/REQUIREMENT-TRACEABILITY-MATRIX.md)
+- [Test Plan](docs/TEST-PLAN.md) & [Test Cases](docs/TEST-CASES.md)
+- [Bug Report Tracking](docs/BUG-REPORT.md)
+- [Software Quality Assurance (SQA) Plan](docs/SQA-PLAN.md)
+- [COCOMO Cost Estimation](docs/COCOMO.md)
+- [PERT Chart](docs/PERT.md) & [Gantt Schedule](docs/GANTT.md)
+- [Data Flow Diagrams (DFD)](docs/DFD.md) & [UML Diagrams](docs/UML.md)
+- [Messaging System Design](docs/MESSAGING-DESIGN.md) & [State Machine](docs/MESSAGING-STATE-MACHINE.md)
+
+---
+
+## 5. Getting Started & Local Development
+
+### Prerequisites
+- Node.js: v18.0.0 or higher
+- npm: v9.0.0 or higher
+- Supabase Account / Local PostgreSQL
+
+### Monorepo Installation
 Clone the repository and install all dependencies across workspace packages:
 ```bash
 # In project root: g:\QueueEz
 npm install
 ```
 
-### 3. Environment Variables
+### Environment Configuration
 
-Create `.env` in `apps/api/`:
+Configure `.env` in `apps/api/` (refer to `apps/api/.env.example`):
 ```env
 PORT=4000
 NODE_ENV=development
@@ -95,67 +115,48 @@ SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 JWT_SECRET=your-secure-jwt-secret-key-at-least-32-chars
 ```
 
-Create `.env` in `apps/web/`:
+Configure `.env` in `apps/web/` (refer to `apps/web/.env.example`):
 ```env
 VITE_API_URL=http://localhost:4000/api/v1
+VITE_API_BASE_URL=http://localhost:4000/api/v1
 VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-### 4. Database Schema Setup
-Execute the complete schema and seed script located at:
-`supabase/migrations/001_initial_schema.sql`
-Run this inside your **Supabase Project SQL Editor**. It creates:
-- Tables: `organizations`, `facilities`, `services`, `counters`, `queue_sessions`, `queue_tickets`, `appointments`, `profiles`, `staff_members`, `audit_logs`
-- Triggers: Auto-update timestamps and automated queue session statistics
-- Row-Level Security: Role-based policies ensuring data isolation
-- Seed Data: Pre-populated facility ("Metro General Hospital"), services (General Consultation, Pharmacy, Lab Test), counters, and demo accounts.
+### Running the Application
 
-### 5. Running the Application
-
-You can run both apps concurrently or independently:
-
+Run both apps concurrently from root:
 ```bash
-# Run both API and Web concurrently from root:
 npm run dev
+```
 
-# Or run API server individually (Port 4000):
+Or run packages individually:
+```bash
+# API Server (Port 4000)
 npm run dev:api
 
-# Or run Web frontend individually (Port 5173):
+# Web Frontend (Port 5173)
 npm run dev:web
 ```
 
 ---
 
-## 🔑 Demo Accounts & Credentials
-
-The system includes pre-seeded demo accounts for instant evaluation:
-
-| Role | Email | Password | Allowed Access |
-|---|---|---|---|
-| **Customer** | `customer@demo.com` | `demo1234` | Facilities, Bookings, Active Ticket, Queue Tracker |
-| **Staff Member** | `staff@demo.com` | `demo1234` | Counter Queue Dashboard (Call, Start, Skip, Complete) |
-| **Facility Admin** | `admin@demo.com` | `demo1234` | Facility Analytics, Operational Overview, Management |
-
----
-
-## 📡 API Reference Overview
+## 6. API Reference Overview
 
 Base URL: `http://localhost:4000/api/v1`
 
-### 1. Authentication (`/auth`)
+### Authentication (`/auth`)
 - `POST /auth/register` — Create new customer account
 - `POST /auth/login` — Sign in and receive session tokens
 - `GET /auth/me` — Retrieve current authenticated profile
 
-### 2. Facilities & Services (`/facilities`)
+### Facilities & Services (`/facilities`)
 - `GET /facilities` — List all active facilities with search & category filters
 - `GET /facilities/:id` — Get facility details, services, and counters
 - `POST /facilities` — Create facility (Admin only)
 - `PATCH /facilities/:id` — Update facility details (Admin only)
 
-### 3. Queue Management (`/queues`)
+### Queue Management (`/queues`)
 - `POST /queues/join` — Join virtual queue and obtain digital ticket
 - `GET /queues/tickets/active` — Get customer's current active ticket
 - `GET /queues/tickets/:ticketId` — Get ticket status & position
@@ -169,7 +170,7 @@ Base URL: `http://localhost:4000/api/v1`
 - `POST /queues/tickets/:ticketId/no-show` — Staff mark ticket as no-show
 - `POST /queues/tickets/:ticketId/transfer` — Staff transfer to another counter
 
-### 4. Appointments (`/appointments`)
+### Appointments (`/appointments`)
 - `POST /appointments` — Book an appointment with automatic time validation
 - `GET /appointments` — List customer or facility appointments
 - `GET /appointments/:id` — View appointment details
@@ -178,7 +179,7 @@ Base URL: `http://localhost:4000/api/v1`
 
 ---
 
-## 🔒 Security & Data Protection
+## 7. Security & Data Protection
 
 - **Password Hashing:** Supabase Auth with bcrypt-hashed credentials.
 - **Row-Level Security (RLS):** Policies enforced at database level — customers can only read and modify their own tickets and appointments.

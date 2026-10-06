@@ -106,7 +106,7 @@ Client Navigation
       ▼
 useMessagingRealtime Hook Mounted
       │
-      ├── Connect to Supabase Realtime Channel:
+      ├── Connect to Database Realtime Channel:
       │   `realtime:conversations:${conversationId}`
       │
       ├── Listen for postgres_changes:

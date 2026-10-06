@@ -208,7 +208,7 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
     const names = getNames();
     setFirstName(names.first);
     setLastName(names.last);
-    setEmail(profile?.email || 'admin@demo.com');
+    setEmail(profile?.email || 'user@queueez.com');
     setPhone(profile?.phone || '+91-9876543210');
     setAvatarPreview(profile?.avatar_url || (profile?.id ? localStorage.getItem(`queueez_avatar_${profile.id}`) : '') || '');
     toast('Changes discarded');
@@ -382,7 +382,7 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
                 <span>Database Sync:</span>
                 <span className="text-emerald-700 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Supabase Connected
+                  Database Connected
                 </span>
               </div>
             </div>
@@ -735,7 +735,7 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
                       or drag and drop
                     </p>
                     <p className="text-caption text-muted mt-1">
-                      SVG, PNG, JPG or GIF (max. 800×400px) • Automatically synced with Supabase
+                      SVG, PNG, JPG or GIF (max. 800×400px) • Automatically synced with database
                     </p>
                   </div>
                 </div>
@@ -797,7 +797,7 @@ export function ProfilePage({ entityRole }: ProfilePageProps) {
                   <div className="flex justify-between">
                     <span className="text-muted">Database Storage:</span>
                     <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Supabase
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Database Active
                     </span>
                   </div>
                 </div>

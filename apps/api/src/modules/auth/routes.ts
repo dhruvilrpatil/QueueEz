@@ -71,11 +71,76 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response)
       });
     }
 
+    // Server-side Bootstrap Admin Verification (Idempotent & Auditable)
+    const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+    if (
+      bootstrapEmail &&
+      req.user?.email &&
+      req.user.email.toLowerCase() === bootstrapEmail &&
+      profile.role === 'customer'
+    ) {
+      const { data: elevated } = await supabaseAdmin
+        .from('profiles')
+        .update({ role: 'facility_admin', updated_at: new Date().toISOString() })
+        .eq('id', req.user.id)
+        .select()
+        .single();
+      if (elevated) {
+        return res.json({ success: true, data: elevated });
+      }
+    }
+
     res.json({ success: true, data: profile });
   } catch (err) {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch profile',
+      code: 'INTERNAL_SERVER_ERROR',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/auth/bootstrap
+ * Server-controlled, authenticated bootstrap for initial organization owner.
+ */
+router.post('/bootstrap', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+    const userEmail = req.user?.email?.trim().toLowerCase();
+
+    if (!bootstrapEmail || !userEmail || userEmail !== bootstrapEmail) {
+      return res.status(403).json({
+        success: false,
+        message: 'Account is not eligible for initial organization owner bootstrap',
+        code: 'NOT_ELIGIBLE',
+      });
+    }
+
+    const { data: updatedProfile, error } = await supabaseAdmin
+      .from('profiles')
+      .update({ role: 'facility_admin', updated_at: new Date().toISOString() })
+      .eq('id', req.user!.id)
+      .select()
+      .single();
+
+    if (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+        code: 'DATABASE_ERROR',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Successfully verified and elevated to organization owner',
+      data: updatedProfile,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Bootstrap operation failed',
       code: 'INTERNAL_SERVER_ERROR',
     });
   }
